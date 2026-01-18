@@ -52,26 +52,47 @@ interface AppState {
   // Dark mode
   darkMode: boolean
   toggleDarkMode: () => void
+
+  // Run colors (fixed per run ID)
+  runColors: Record<string, string>
+  setRunColor: (runId: string, color: string) => void
 }
 
-// Export COLORS so other components can use the same palette
+// Export COLORS - WandB-style elegant palette
 export const RUN_COLORS = [
-  '#f59e0b', // amber
-  '#3b82f6', // blue
-  '#10b981', // emerald
-  '#ef4444', // red
-  '#8b5cf6', // violet
-  '#ec4899', // pink
-  '#06b6d4', // cyan
-  '#f97316', // orange
-  '#84cc16', // lime
-  '#6366f1', // indigo
+  '#E91E63', // pink
+  '#9C27B0', // purple
+  '#673AB7', // deep purple
+  '#3F51B5', // indigo
+  '#2196F3', // blue
+  '#00BCD4', // cyan
+  '#009688', // teal
+  '#4CAF50', // green
+  '#8BC34A', // light green
+  '#CDDC39', // lime
+  '#FFEB3B', // yellow
+  '#FFC107', // amber
+  '#FF9800', // orange
+  '#FF5722', // deep orange
+  '#795548', // brown
+  '#9E9E9E', // grey
+  '#607D8B', // blue grey
 ]
 
-// Helper to get color for a run based on its index in selectedRunIds
-export const getRunColor = (runId: string, selectedRunIds: string[]): string => {
-  const idx = selectedRunIds.indexOf(runId)
-  return idx >= 0 ? RUN_COLORS[idx % RUN_COLORS.length] : '#9ca3af'
+// Helper to generate a deterministic color for a run based on its ID
+// This ensures each run gets a consistent color
+export function generateColorForRun(runId: string): string {
+  // Simple hash function to get consistent color from run ID
+  let hash = 0
+  for (let i = 0; i < runId.length; i++) {
+    hash = runId.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return RUN_COLORS[Math.abs(hash) % RUN_COLORS.length]
+}
+
+// Helper to get color for a run (checks stored color first, then generates)
+export function getRunColor(runId: string, runColors: Record<string, string>): string {
+  return runColors[runId] || generateColorForRun(runId)
 }
 
 export const useAppStore = create<AppState>()(
@@ -158,6 +179,12 @@ export const useAppStore = create<AppState>()(
       
       darkMode: false,
       toggleDarkMode: () => set((state) => ({ darkMode: !state.darkMode })),
+
+      runColors: {},
+      setRunColor: (runId, color) =>
+        set((state) => ({
+          runColors: { ...state.runColors, [runId]: color },
+        })),
     }),
     {
       name: 'lowvr-storage',
@@ -167,6 +194,7 @@ export const useAppStore = create<AppState>()(
         sidebarCollapsed: state.sidebarCollapsed,
         viewMode: state.viewMode,
         darkMode: state.darkMode,
+        runColors: state.runColors,
       }),
     }
   )

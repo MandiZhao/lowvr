@@ -1,9 +1,10 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Run } from '../hooks/useRuns'
 import { useAppStore, getRunColor } from '../stores/appStore'
 import { Search, Check, X, GripVertical, Trash2, Square } from 'lucide-react'
 import clsx from 'clsx'
+import ColorPicker from './ColorPicker'
 
 interface Props {
   runs: Run[]
@@ -91,6 +92,8 @@ export default function RunSelector({ runs, isLoading, darkMode = false }: Props
     removeConfigDisplayKey,
     hoveredRunId,
     setHoveredRunId,
+    runColors,
+    setRunColor,
   } = useAppStore()
   const [search, setSearch] = useState('')
   
@@ -101,10 +104,16 @@ export default function RunSelector({ runs, isLoading, darkMode = false }: Props
   // Delete confirmation state
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
   
   // Stop confirmation state
   const [stopConfirm, setStopConfirm] = useState<{ id: string; name: string } | null>(null)
   const [isStopping, setIsStopping] = useState(false)
+  
+  // Color picker state
+  const [colorPickerRunId, setColorPickerRunId] = useState<string | null>(null)
+  const colorPickerRef = useRef<HTMLDivElement>(null)
   
   const handleDeleteRun = async (runId: string) => {
     setIsDeleting(true)
@@ -128,6 +137,59 @@ export default function RunSelector({ runs, isLoading, darkMode = false }: Props
       setIsDeleting(false)
     }
   }
+
+  const handleBulkDelete = async () => {
+    if (selectedRunIds.length === 0) return
+    
+    setIsBulkDeleting(true)
+    try {
+      // Delete all selected runs in parallel
+      const deletePromises = selectedRunIds.map(runId =>
+        fetch(`/api/runs/${runId}`, { method: 'DELETE' })
+      )
+      
+      const results = await Promise.allSettled(deletePromises)
+      const failed = results.filter(r => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok))
+      
+      if (failed.length > 0) {
+        alert(`Failed to delete ${failed.length} run(s)`)
+      }
+      
+      setBulkDeleteConfirm(false)
+      clearSelection()
+      // Invalidate runs query to refetch
+      await queryClient.invalidateQueries({ queryKey: ['runs'] })
+    } catch (err) {
+      alert(`Failed to delete runs: ${err}`)
+    } finally {
+      setIsBulkDeleting(false)
+    }
+  }
+
+  // Close color picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (colorPickerRef.current && !colorPickerRef.current.contains(event.target as Node)) {
+        // Check if click is on the color dot itself (don't close if clicking the dot)
+        const target = event.target as HTMLElement
+        if (target.closest('[data-color-dot]')) {
+          return
+        }
+        setColorPickerRunId(null)
+      }
+    }
+    
+    if (colorPickerRunId) {
+      // Use a small delay to avoid closing immediately when opening
+      const timeout = setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutside)
+      }, 100)
+      return () => {
+        clearTimeout(timeout)
+        document.removeEventListener('mousedown', handleClickOutside)
+      }
+    }
+  }, [colorPickerRunId])
   
   const handleStopRun = async (runId: string) => {
     setIsStopping(true)
@@ -149,7 +211,7 @@ export default function RunSelector({ runs, isLoading, darkMode = false }: Props
   }
   
   const filteredRuns = useMemo(() => {
-    return runs.filter((run) => {
+    const filtered = runs.filter((run) => {
       if (search) {
         const searchLower = search.toLowerCase()
         const matchesId = run.id.toLowerCase().includes(searchLower)
@@ -172,6 +234,13 @@ export default function RunSelector({ runs, isLoading, darkMode = false }: Props
       }
 
       return true
+    })
+
+    return filtered.sort((a, b) => {
+      const aTime = a.created_at ? Date.parse(a.created_at) : 0
+      const bTime = b.created_at ? Date.parse(b.created_at) : 0
+      if (aTime === bTime) return b.id.localeCompare(a.id)
+      return bTime - aTime
     })
   }, [runs, search, configFilters])
 
@@ -261,19 +330,37 @@ export default function RunSelector({ runs, isLoading, darkMode = false }: Props
       </div>
 
       {/* Bulk actions */}
-      <div className="px-2 py-1 border-b border-gray-200 flex items-center justify-end gap-2 text-xs text-gray-500 flex-shrink-0">
-        <button
-          onClick={() => selectRuns(filteredRuns.slice(0, 5).map(r => r.id))}
-          className="hover:text-amber-600"
-        >
-          First 5
-        </button>
-        <button
-          onClick={() => selectRuns(filteredRuns.map(r => r.id))}
-          className="hover:text-amber-600"
-        >
-          All
-        </button>
+      <div className={clsx(
+        "px-2 py-1 border-b flex items-center justify-between gap-2 text-xs flex-shrink-0",
+        darkMode ? "border-gray-700" : "border-gray-200"
+      )}>
+        <div className="flex items-center gap-2">
+          {selectedRunIds.length > 0 && (
+            <button
+              onClick={() => setBulkDeleteConfirm(true)}
+              className={clsx(
+                "px-2 py-1 rounded hover:bg-red-50 hover:text-red-600 transition-colors",
+                darkMode ? "text-gray-400 hover:bg-red-900/20" : "text-red-600"
+              )}
+            >
+              Delete {selectedRunIds.length} run{selectedRunIds.length !== 1 ? 's' : ''}
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-2 text-gray-500">
+          <button
+            onClick={() => selectRuns(filteredRuns.slice(0, 5).map(r => r.id))}
+            className="hover:text-amber-600"
+          >
+            First 5
+          </button>
+          <button
+            onClick={() => selectRuns(filteredRuns.map(r => r.id))}
+            className="hover:text-amber-600"
+          >
+            All
+          </button>
+        </div>
       </div>
 
       {/* Column headers */}
@@ -340,23 +427,45 @@ export default function RunSelector({ runs, isLoading, darkMode = false }: Props
                 {/* Run info */}
                 <div
                   className={clsx(
-                    "flex items-start gap-1.5 px-2 py-1.5",
+                    "flex items-center gap-1.5 px-2 py-1.5 relative",
                     hasConfigColumns ? "flex-shrink-0" : "flex-1"
                   )}
                   style={hasConfigColumns ? { width: runColumnWidth } : undefined}
                 >
-                  {/* Color dot for selected runs - matches chart line color */}
-                  {isSelected && (
-                    <div
-                      className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-0.5"
-                      style={{ backgroundColor: getRunColor(run.id, selectedRunIds) }}
+                  {/* Fixed color dot for all runs - like online wandb */}
+                  <div className="relative flex-shrink-0">
+                    <button
+                      type="button"
+                      data-color-dot
+                      className="w-2.5 h-2.5 rounded-full cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-gray-400 transition-all focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-gray-400"
+                      style={{ backgroundColor: getRunColor(run.id, runColors) }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setColorPickerRunId(colorPickerRunId === run.id ? null : run.id)
+                      }}
+                      title="Click to change color"
                     />
-                  )}
+                    {colorPickerRunId === run.id && (
+                      <div 
+                        ref={colorPickerRef}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ColorPicker
+                          currentColor={getRunColor(run.id, runColors)}
+                          onSelectColor={(color) => {
+                            setRunColor(run.id, color)
+                            setColorPickerRunId(null)
+                          }}
+                          darkMode={darkMode}
+                        />
+                      </div>
+                    )}
+                  </div>
                   
                   <button
                     onClick={() => toggleRunSelection(run.id)}
                     className={clsx(
-                      'w-3.5 h-3.5 rounded border flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors',
+                      'w-3.5 h-3.5 rounded border flex-shrink-0 flex items-center justify-center transition-colors',
                       isSelected
                         ? 'bg-amber-500 border-amber-500'
                         : darkMode 
@@ -530,6 +639,39 @@ export default function RunSelector({ runs, isLoading, darkMode = false }: Props
                 className="px-4 py-2 text-sm bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors disabled:opacity-50"
               >
                 {isStopping ? 'Stopping...' : 'Stop'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk delete confirmation dialog */}
+      {bulkDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Delete {selectedRunIds.length} Run{selectedRunIds.length !== 1 ? 's' : ''}?
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Are you sure you want to permanently delete {selectedRunIds.length} selected run{selectedRunIds.length !== 1 ? 's' : ''}?
+            </p>
+            <p className="text-xs text-red-600 mb-4">
+              This action cannot be undone. The entire run folders will be deleted.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setBulkDeleteConfirm(false)}
+                disabled={isBulkDeleting}
+                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                disabled={isBulkDeleting}
+                className="px-4 py-2 text-sm bg-red-500 text-white rounded hover:bg-red-600 transition-colors disabled:opacity-50"
+              >
+                {isBulkDeleting ? 'Deleting...' : `Delete ${selectedRunIds.length} Run${selectedRunIds.length !== 1 ? 's' : ''}`}
               </button>
             </div>
           </div>

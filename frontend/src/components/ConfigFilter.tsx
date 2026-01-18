@@ -187,7 +187,9 @@ export default function ConfigFilter({ darkMode = false }: Props) {
 
   const groupedKeys = useMemo(() => {
     if (!configKeys) return {}
-    return groupKeys(configKeys)
+    const isHiddenKey = (key: string) => key.startsWith('_wandb') || key.startsWith('wandb_version')
+    const visibleKeys = configKeys.filter((key) => !isHiddenKey(key))
+    return groupKeys(visibleKeys)
   }, [configKeys])
 
   const filteredGroups = useMemo(() => {
@@ -211,7 +213,8 @@ export default function ConfigFilter({ darkMode = false }: Props) {
     
     const values: Record<string, Set<string>> = {}
     
-    for (const key of configKeys) {
+    const isHiddenKey = (key: string) => key.startsWith('_wandb') || key.startsWith('wandb_version')
+    for (const key of configKeys.filter((k) => !isHiddenKey(k))) {
       values[key] = new Set()
       for (const run of runs) {
         const value = getNestedValue(run.config, key)

@@ -1,8 +1,7 @@
-# LowVR
+# <img src="./lowvr-2d.png" alt="lowvr logo" height="25" /> Lowvr  
 
-A clean, minimal local viewer for WandB experiment logs. View and compare runs without uploading to the cloud.
+A clean, minimal local viewer for WandB experiment logs. View and compare runs without uploading to the cloud.  
 
-![Lowvr](https://img.shields.io/badge/lowvr-local-orange)
 
 ## Features
 

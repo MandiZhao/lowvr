@@ -17,7 +17,7 @@ class RunLoader:
     def __init__(self, wandb_dir: str | Path):
         self.wandb_dir = Path(wandb_dir)
         self._runs_cache: dict[str, dict] = {}
-        self._history_cache: dict[str, list] = {}
+        self._history_cache: dict[str, dict[str, Any]] = {}
         self._binary_data_cache: dict[str, dict] = {}
     
     def discover_runs(self) -> list[dict]:
@@ -199,8 +199,15 @@ class RunLoader:
             for i, part in enumerate(parts[:-1]):
                 if part not in current:
                     current[part] = {}
+                elif not isinstance(current[part], dict):
+                    # If the part already exists as a non-dict value, we can't nest
+                    # Skip nested structure and use flat key instead
+                    config[key_path] = parsed_value
+                    break
                 current = current[part]
-            current[parts[-1]] = parsed_value
+            else:
+                # Only set the value if we didn't break (nested structure was successful)
+                current[parts[-1]] = parsed_value
         
         return config
 
@@ -255,9 +262,6 @@ class RunLoader:
         Get the full history (time series) for a run.
         This reads the .wandb binary file.
         """
-        if not force_reload and run_id in self._history_cache:
-            return self._history_cache[run_id]
-        
         run = self.get_run(run_id)
         if not run:
             return []
@@ -265,14 +269,26 @@ class RunLoader:
         wandb_file = run.get('wandb_file')
         if not wandb_file or not Path(wandb_file).exists():
             return []
+
+        wandb_path = Path(wandb_file)
+        mtime = wandb_path.stat().st_mtime
+        cached = self._history_cache.get(run_id)
+        if cached and not force_reload and cached.get('mtime') == mtime:
+            return cached.get('history', [])
         
         try:
             data = read_wandb_file(wandb_file)
             history = data.get('history', [])
-            self._history_cache[run_id] = history
+            if not history:
+                print(f"Warning: No history found in wandb file for {run_id}: {wandb_file}")
+            else:
+                print(f"Loaded {len(history)} history rows for {run_id} (display_name: {run.get('display_name', 'N/A')})")
+            self._history_cache[run_id] = {'history': history, 'mtime': mtime}
             return history
         except Exception as e:
             print(f"Error reading history for {run_id}: {e}")
+            import traceback
+            traceback.print_exc()
             return []
     
     def get_run_metrics(
@@ -284,21 +300,46 @@ class RunLoader:
         Get specific metrics from a run's history in columnar format.
         """
         history = self.get_run_history(run_id)
-        return extract_metrics_from_history(history, metric_keys)
+        if not history:
+            print(f"Warning: No history for {run_id} when getting metrics")
+            return {}
+        metrics = extract_metrics_from_history(history, metric_keys)
+        return metrics
     
     def get_available_metrics(self, run_id: str) -> list[str]:
         """Get list of available numeric metrics for a run."""
         history = self.get_run_history(run_id)
         if not history:
+            print(f"No history available for {run_id}")
             return []
         
         metrics = set()
-        for row in history[:20]:  # Sample first 20 rows
+        # Check more rows to catch metrics that appear later, or all rows if less than 100
+        sample_size = min(100, len(history))
+        for row in history[:sample_size]:
             for key, value in row.items():
-                if isinstance(value, (int, float)) and not key.startswith('_'):
-                    metrics.add(key)
+                # Include numeric values, excluding internal wandb keys
+                # But allow some common metric patterns that start with letters/numbers
+                if isinstance(value, (int, float)):
+                    # Exclude internal wandb keys like _step, _timestamp, _runtime
+                    # But include metrics that might have underscores in the middle
+                    if not key.startswith('_') or key in ['_step', '_timestamp', '_runtime']:
+                        metrics.add(key)
         
-        return sorted(metrics)
+        # If we didn't find many metrics, try checking all rows
+        if len(metrics) < 3 and len(history) > sample_size:
+            for row in history:
+                for key, value in row.items():
+                    if isinstance(value, (int, float)) and not key.startswith('_'):
+                        metrics.add(key)
+        
+        result = sorted(metrics)
+        if not result:
+            print(f"Warning: No metrics found in history for {run_id}. History has {len(history)} rows.")
+            if history:
+                print(f"Sample row keys: {list(history[0].keys())[:10]}")
+        
+        return result
     
     def get_run_videos(self, run_id: str) -> list[dict]:
         """Get list of video/gif files for a run."""
@@ -337,7 +378,11 @@ class RunLoader:
             if config:
                 self._flatten_keys(config, '', all_keys)
         
-        return sorted(all_keys)
+        return sorted(
+            key
+            for key in all_keys
+            if not key.startswith('_wandb') and not key.startswith('wandb_version')
+        )
     
     def _flatten_keys(self, obj: Any, prefix: str, keys: set):
         """Recursively flatten nested dict keys."""

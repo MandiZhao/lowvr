@@ -37,7 +37,7 @@ export default function App() {
   const [showRunSets, setShowRunSets] = useState(false)
   const [showConfigFilter, setShowConfigFilter] = useState(true)
   const [showMetrics, setShowMetrics] = useState(true)
-  const [metricsHeight, setMetricsHeight] = useState(200)
+  const [metricsHeight, setMetricsHeight] = useState(260)
   const [isResizingMetrics, setIsResizingMetrics] = useState(false)
   
   // Resizable sidebar
@@ -101,13 +101,13 @@ export default function App() {
         <div className="flex items-center gap-3">
           {/* View mode toggle */}
           <div className={clsx(
-            "flex items-center rounded-lg p-1 border shadow-sm",
+            "flex items-center rounded-lg p-1 border shadow-sm h-10",
             darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"
           )}>
             <button
               onClick={() => setViewMode('charts')}
               className={clsx(
-                'px-3 py-2 rounded-md transition-colors flex items-center gap-2 text-sm font-medium',
+                'px-3 h-8 rounded-md transition-colors flex items-center gap-2 text-sm font-medium',
                 viewMode === 'charts' 
                   ? 'bg-amber-100 text-amber-700' 
                   : darkMode
@@ -122,7 +122,7 @@ export default function App() {
             <button
               onClick={() => setViewMode('videos')}
               className={clsx(
-                'px-3 py-2 rounded-md transition-colors flex items-center gap-2 text-sm font-medium',
+                'px-3 h-8 rounded-md transition-colors flex items-center gap-2 text-sm font-medium',
                 viewMode === 'videos' 
                   ? 'bg-amber-100 text-amber-700' 
                   : darkMode
@@ -137,7 +137,7 @@ export default function App() {
             <button
               onClick={() => setViewMode('both')}
               className={clsx(
-                'px-3 py-2 rounded-md transition-colors flex items-center gap-2 text-sm font-medium',
+                'px-3 h-8 rounded-md transition-colors flex items-center gap-2 text-sm font-medium',
                 viewMode === 'both' 
                   ? 'bg-amber-100 text-amber-700' 
                   : darkMode
@@ -155,7 +155,7 @@ export default function App() {
           <button
             onClick={() => setShowRunSets(!showRunSets)}
             className={clsx(
-              'px-3 py-2 rounded-lg transition-colors border flex items-center gap-2 text-sm font-medium',
+              'px-3 h-10 rounded-lg transition-colors border flex items-center gap-2 text-sm font-medium',
               showRunSets
                 ? 'bg-amber-100 text-amber-700 border-amber-300'
                 : 'text-gray-500 hover:text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
@@ -170,7 +170,7 @@ export default function App() {
           <button
             onClick={() => setShowConfigFilter(!showConfigFilter)}
             className={clsx(
-              'px-3 py-2 rounded-lg transition-colors border flex items-center gap-2 text-sm font-medium',
+              'px-3 h-10 rounded-lg transition-colors border flex items-center gap-2 text-sm font-medium',
               showConfigFilter
                 ? 'bg-amber-100 text-amber-700 border-amber-300'
                 : 'text-gray-500 hover:text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
@@ -184,25 +184,29 @@ export default function App() {
 
         <div className="flex items-center gap-3">
           <h1 className={clsx(
-            "text-xl font-semibold flex items-center gap-2",
+            "text-2xl font-semibold flex items-center gap-2 h-10",
             darkMode ? "text-gray-100" : "text-gray-900"
           )}>
-            <span className="text-2xl">📊</span>
-            WandB Viewer
+            <img 
+              src="/lowvr-2d.png" 
+              alt="lowvr logo" 
+              className="w-10 h-10 object-contain"
+            />
+            lowvr
           </h1>
           <span className={clsx(
-            "text-sm px-2 py-1 rounded",
+            "text-sm px-2 rounded h-10 inline-flex items-center",
             darkMode ? "text-gray-400 bg-gray-700" : "text-gray-500 bg-gray-200"
           )}>
             {runs?.length || 0} runs
           </span>
 
           {/* Auto-refresh controls */}
-          <div className="flex items-center gap-1 border border-gray-200 rounded-lg px-2 py-1.5 bg-white">
+          <div className="flex items-center gap-1 border border-gray-200 rounded-lg px-2 h-10 bg-white">
             <button
               onClick={() => setAutoRefresh(!autoRefresh)}
               className={clsx(
-                'p-1.5 rounded transition-colors flex items-center gap-1 text-sm',
+                'p-1.5 rounded transition-colors flex items-center gap-1 text-sm h-8 w-8 justify-center',
                 autoRefresh
                   ? 'text-green-600'
                   : 'text-gray-400 hover:text-gray-700'
@@ -215,7 +219,7 @@ export default function App() {
               <select
                 value={refreshInterval}
                 onChange={(e) => setRefreshInterval(Number(e.target.value))}
-                className="bg-transparent text-xs text-gray-600 focus:outline-none"
+                className="bg-transparent text-xs text-gray-600 focus:outline-none h-8"
               >
                 <option value={10}>10s</option>
                 <option value={30}>30s</option>
@@ -230,7 +234,7 @@ export default function App() {
             onClick={() => refetch()}
             disabled={isRefetching}
             className={clsx(
-              "p-2.5 rounded-lg transition-colors disabled:opacity-50 border",
+              "h-10 w-10 rounded-lg transition-colors disabled:opacity-50 border flex items-center justify-center",
               darkMode 
                 ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700 border-gray-600" 
                 : "text-gray-500 hover:text-gray-700 hover:bg-gray-100 border-gray-200"
@@ -244,7 +248,7 @@ export default function App() {
           <button
             onClick={toggleDarkMode}
             className={clsx(
-              "p-2.5 rounded-full transition-all duration-300 border-2 relative overflow-hidden",
+              "h-10 w-10 rounded-full transition-all duration-300 border-2 relative overflow-hidden flex items-center justify-center",
               darkMode 
                 ? "bg-indigo-900 border-indigo-400 text-yellow-300 hover:bg-indigo-800 shadow-lg shadow-indigo-500/30" 
                 : "bg-amber-50 border-amber-300 text-amber-500 hover:bg-amber-100 shadow-lg shadow-amber-200/50"
@@ -287,10 +291,7 @@ export default function App() {
             <>
               {/* Config Filter Panel */}
               {showConfigFilter && (
-                <div className={clsx(
-                  "border-b max-h-64 overflow-y-auto flex-shrink-0",
-                  darkMode ? "border-gray-700" : "border-gray-200"
-                )}>
+                <div className="max-h-40 overflow-y-auto flex-shrink-0">
                   <ConfigFilter darkMode={darkMode} />
                 </div>
               )}
@@ -304,7 +305,7 @@ export default function App() {
                   {/* Draggable divider between Runs and Metrics */}
                   <div
                     className={clsx(
-                      'w-full border-t-2 flex items-center justify-center gap-1 text-xs transition-colors cursor-ns-resize select-none',
+                      'w-full border-t-2 flex items-center justify-center gap-1 text-base transition-colors cursor-ns-resize select-none',
                       isResizingMetrics 
                         ? 'border-amber-400 bg-amber-50 text-amber-600' 
                         : darkMode

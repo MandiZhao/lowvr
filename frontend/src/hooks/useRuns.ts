@@ -136,5 +136,6 @@ export function useMultiRunMetrics(runIds: string[], keys?: string[]) {
     },
     enabled: runIds.length > 0,
     staleTime: 60000,
+    placeholderData: (prev) => prev,
   })
 }

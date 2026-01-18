@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useAvailableMetrics } from '../hooks/useRuns'
+import { useQueries } from '@tanstack/react-query'
 import { useAppStore } from '../stores/appStore'
 import { Check, ChevronDown, ChevronUp, Search } from 'lucide-react'
 import clsx from 'clsx'
@@ -28,11 +28,41 @@ export default function MetricSelector({ runIds, darkMode = false }: Props) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Episode', 'losses']))
   const [search, setSearch] = useState('')
   
-  // Fetch available metrics from first run
-  const { data: availableMetrics, isLoading } = useAvailableMetrics(runIds[0])
+  const metricQueries = useQueries({
+    queries: runIds.map((runId) => ({
+      queryKey: ['available-metrics', runId],
+      queryFn: async () => {
+        const res = await fetch(`/api/runs/${runId}/available-metrics`)
+        if (!res.ok) throw new Error('Failed to fetch available metrics')
+        return res.json() as Promise<string[]>
+      },
+      enabled: !!runId,
+      staleTime: 60000,
+    })),
+  })
+
+  const { availableMetrics, isLoading, error } = useMemo(() => {
+    const metricsSet = new Set<string>()
+    let loading = false
+    let firstError: unknown = null
+
+    metricQueries.forEach((query) => {
+      if (query.isLoading) loading = true
+      if (!firstError && query.error) firstError = query.error
+      if (query.data) {
+        query.data.forEach((metric) => metricsSet.add(metric))
+      }
+    })
+
+    return {
+      availableMetrics: Array.from(metricsSet).sort(),
+      isLoading: loading,
+      error: firstError,
+    }
+  }, [metricQueries])
 
   const groupedMetrics = useMemo(() => {
-    if (!availableMetrics) return {}
+    if (!availableMetrics || availableMetrics.length === 0) return {}
     
     // Filter by search
     let filtered = availableMetrics
@@ -66,6 +96,14 @@ export default function MetricSelector({ runIds, darkMode = false }: Props) {
     }
   }
 
+  if (runIds.length === 0) {
+    return (
+      <div className={clsx("p-3 text-sm", darkMode ? "text-gray-500" : "text-gray-400")}>
+        Select runs to view metrics
+      </div>
+    )
+  }
+
   if (isLoading) {
     return (
       <div className={clsx("p-3 text-sm", darkMode ? "text-gray-500" : "text-gray-400")}>
@@ -74,34 +112,25 @@ export default function MetricSelector({ runIds, darkMode = false }: Props) {
     )
   }
 
+  if (error) {
+    return (
+      <div className={clsx("p-3 text-sm", darkMode ? "text-red-400" : "text-red-600")}>
+        Error loading metrics
+      </div>
+    )
+  }
+
   const groups = Object.entries(groupedMetrics).sort(([a], [b]) => a.localeCompare(b))
 
   return (
     <div className="text-sm">
-      <div className={clsx(
-        "px-3 py-2 text-xs uppercase tracking-wide border-b flex items-center justify-between",
-        darkMode ? "text-gray-400 border-gray-700" : "text-gray-500 border-gray-200"
-      )}>
-        <span>Metrics</span>
-        {activeMetrics.length > 0 && (
-          <button
-            onClick={() => setActiveMetrics([])}
-            className={clsx(
-              "hover:text-red-500 lowercase",
-              darkMode ? "text-gray-500" : "text-gray-400"
-            )}
-          >
-            Clear ({activeMetrics.length})
-          </button>
-        )}
-      </div>
-
       {/* Search bar */}
       <div className={clsx(
-        "px-3 py-2 border-b",
-        darkMode ? "border-gray-700" : "border-gray-200"
+        "px-3 py-2",
+        darkMode ? "text-gray-400" : "text-gray-500"
       )}>
-        <div className="relative">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
           <Search size={14} className={clsx(
             "absolute left-2 top-1/2 -translate-y-1/2",
             darkMode ? "text-gray-500" : "text-gray-400"
@@ -118,6 +147,18 @@ export default function MetricSelector({ runIds, darkMode = false }: Props) {
                 : "bg-white border-gray-200 text-gray-900 placeholder-gray-400"
             )}
           />
+          </div>
+          {activeMetrics.length > 0 && (
+            <button
+              onClick={() => setActiveMetrics([])}
+              className={clsx(
+                "text-xs hover:text-red-500",
+                darkMode ? "text-gray-500" : "text-gray-400"
+              )}
+            >
+              Clear ({activeMetrics.length})
+            </button>
+          )}
         </div>
       </div>
 

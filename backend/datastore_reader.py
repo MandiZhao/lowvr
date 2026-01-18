@@ -2,6 +2,7 @@
 Read wandb .wandb binary log files using the official protobuf format.
 """
 import json
+import numbers
 from pathlib import Path
 from typing import Any
 
@@ -115,10 +116,18 @@ def extract_metrics_from_history(history: list[dict], metric_keys: list[str] | N
     # If no keys specified, find all numeric keys
     if metric_keys is None:
         metric_keys = set()
-        for row in history[:10]:  # Sample first 10 rows
+        # Sample more rows to catch metrics that appear later
+        sample_size = min(50, len(history))
+        for row in history[:sample_size]:
             for key, value in row.items():
                 if isinstance(value, (int, float)) and not key.startswith('_'):
                     metric_keys.add(key)
+        # If we didn't find many, check all rows
+        if len(metric_keys) < 3 and len(history) > sample_size:
+            for row in history:
+                for key, value in row.items():
+                    if isinstance(value, (int, float)) and not key.startswith('_'):
+                        metric_keys.add(key)
         metric_keys = sorted(metric_keys)
     
     # Ensure we include x-axis keys that exist in data
@@ -127,16 +136,37 @@ def extract_metrics_from_history(history: list[dict], metric_keys: list[str] | N
     result = {key: [] for key in all_keys}
     result['_step'] = []  # Always include _step
     
+    def coerce_numeric(value: Any) -> float | None:
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, numbers.Real):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except ValueError:
+                return None
+        if isinstance(value, dict):
+            inner = value.get('value')
+            if inner is not None:
+                return coerce_numeric(inner)
+        if isinstance(value, (list, tuple)) and len(value) == 1:
+            return coerce_numeric(value[0])
+        return None
+
+    # Process all history rows (no truncation)
     for row in history:
         result['_step'].append(row.get('_step', len(result['_step'])))
         for key in all_keys:
             if key == '_step':
                 continue
             value = row.get(key)
-            if isinstance(value, (int, float)):
-                result[key].append(value)
-            else:
-                result[key].append(None)
+            numeric = coerce_numeric(value)
+            result[key].append(numeric)
+    
+    # Debug: log how many data points we extracted
+    if result and '_step' in result:
+        print(f"Extracted {len(result['_step'])} data points from {len(history)} history rows")
     
     # Remove empty x-axis keys (all None values)
     keys_to_remove = []

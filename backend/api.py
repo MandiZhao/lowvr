@@ -125,6 +125,11 @@ async def get_run_metrics(
         raise HTTPException(404, f"Run {run_id} not found")
     
     metrics = loader.get_run_metrics(run_id, keys)
+    # Debug: log metric extraction
+    if metrics:
+        sample_key = list(metrics.keys())[0] if metrics else None
+        if sample_key:
+            print(f"Metrics for {run_id} (display: {run.get('display_name', 'N/A')}): {len(metrics)} keys, {len(metrics[sample_key])} data points for '{sample_key}'")
     return metrics
 
 

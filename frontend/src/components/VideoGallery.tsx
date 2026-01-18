@@ -3,15 +3,12 @@ import { useRuns, Video } from '../hooks/useRuns'
 import { useQuery } from '@tanstack/react-query'
 import { Play, Pause, ChevronLeft, ChevronRight, Minus, Plus, Move, ChevronDown, ChevronUp, Maximize2, X } from 'lucide-react'
 import clsx from 'clsx'
-import { RUN_COLORS } from '../stores/appStore'
+import { useAppStore, getRunColor } from '../stores/appStore'
 
 interface Props {
   runIds: string[]
   darkMode?: boolean
 }
-
-// Use shared colors from store
-const COLORS = RUN_COLORS
 
 function VideoCard({ 
   runId, 
@@ -169,6 +166,7 @@ interface ExpandedVideoInfo {
 
 export default function VideoGallery({ runIds, darkMode: _darkMode = false }: Props) {
   const { data: runs } = useRuns()
+  const { runColors } = useAppStore()
   const { data: allVideosData, isLoading } = useMultipleRunVideos(runIds)
   const [currentEpochIdx, setCurrentEpochIdx] = useState(0)
   const [defaultSize, setDefaultSize] = useState(200)
@@ -242,10 +240,10 @@ export default function VideoGallery({ runIds, darkMode: _darkMode = false }: Pr
   }
 
   // Get videos for current epoch from each run
-  const currentVideos = allVideosData.map(({ runId, videos }, idx) => {
+  const currentVideos = allVideosData.map(({ runId, videos }) => {
     const video = videos.find(v => v.epoch === currentEpoch)
     const { displayName, fullName } = getNames(runId)
-    return { runId, video, color: COLORS[idx % COLORS.length], displayName, fullName }
+    return { runId, video, color: getRunColor(runId, runColors), displayName, fullName }
   }).filter(({ video }) => video !== undefined)
 
   return (
@@ -401,9 +399,9 @@ export default function VideoGallery({ runIds, darkMode: _darkMode = false }: Pr
       <div className="mt-8">
         <h3 className="text-sm font-medium text-gray-500 mb-4">All Epochs by Run</h3>
         <div className="space-y-2">
-          {allVideosData.map(({ runId, videos }, idx) => {
+          {allVideosData.map(({ runId, videos }) => {
             if (videos.length === 0) return null
-            const color = COLORS[idx % COLORS.length]
+            const color = getRunColor(runId, runColors)
             const runInfo = runs?.find(r => r.id === runId)
             const isExpanded = expandedRuns.has(runId)
             
