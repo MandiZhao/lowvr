@@ -476,13 +476,25 @@ export default function RunSelector({ runs, isLoading, darkMode = false }: Props
                     {isSelected && <Check size={10} className="text-white" />}
                   </button>
 
-                  <button
-                    onClick={() => toggleRunSelection(run.id)}
-                    className="flex-1 min-w-0 flex items-center gap-1 text-left"
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      const selection = window.getSelection()?.toString() || ''
+                      if (selection) return
+                      toggleRunSelection(run.id)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        toggleRunSelection(run.id)
+                      }
+                    }}
+                    className="flex-1 min-w-0 flex items-center gap-1 text-left cursor-pointer"
                   >
                     {/* Display name - full width */}
                     <p className={clsx(
-                      'text-xs truncate flex-1',
+                      'text-xs truncate flex-1 select-text',
                       darkMode
                         ? (isSelected ? 'text-gray-100' : 'text-gray-300')
                         : (isSelected ? 'text-gray-900' : 'text-gray-600')
@@ -509,7 +521,7 @@ export default function RunSelector({ runs, isLoading, darkMode = false }: Props
                         vid
                       </span>
                     )}
-                  </button>
+                  </div>
 
                   {/* Stop button - only for running runs */}
                   {run.state === 'running' && (
@@ -541,13 +553,29 @@ export default function RunSelector({ runs, isLoading, darkMode = false }: Props
                 {/* Config value columns */}
                 {hasConfigColumns && (
                   <>
-                    <div className="w-1 bg-gray-100" />
+                    <div className={clsx(
+                      "w-px",
+                      isSelected
+                        ? (darkMode ? "bg-amber-900/30" : "bg-amber-50")
+                        : (darkMode ? "bg-gray-700" : "bg-gray-200"),
+                      darkMode ? "group-hover/row:bg-gray-700" : "group-hover/row:bg-gray-200"
+                    )} />
                     {configDisplayKeys.map(key => {
                       const value = getNestedValue(run.config, key)
                       return (
                         <div 
                           key={key}
-                          className="flex-1 min-w-[60px] px-1 py-1.5 text-xs text-gray-600 text-center border-l border-gray-100 flex items-center justify-center"
+                          className={clsx(
+                            "flex-1 min-w-[60px] px-1 py-1.5 text-xs text-center border-l flex items-center justify-center bg-transparent",
+                            darkMode ? "border-gray-700" : "border-gray-100",
+                            darkMode ? "group-hover/row:bg-gray-700" : "group-hover/row:bg-gray-50",
+                            isSelected
+                              ? (darkMode ? "bg-amber-900/30" : "bg-amber-50")
+                              : "",
+                            darkMode
+                              ? (isSelected ? "text-gray-100" : "text-gray-300")
+                              : (isSelected ? "text-gray-900" : "text-gray-600")
+                          )}
                           title={`${key}: ${value}`}
                         >
                           {formatValue(value)}

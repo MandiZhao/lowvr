@@ -328,71 +328,76 @@ export default function VideoGallery({ runIds, darkMode: _darkMode = false }: Pr
         </div>
       </div>
 
-      {/* Expanded video - inline full-width view (appears before grid) */}
-      {expandedVideo && (
-        <div className="bg-white border-2 border-amber-400 rounded-xl shadow-lg w-full mb-4">
-          {/* Header */}
-          <div className="flex items-start justify-between gap-4 p-4 border-b border-gray-200 bg-amber-50 rounded-t-xl">
-            <div className="flex items-start gap-3 min-w-0 flex-1">
-              <div 
-                className="w-3 h-3 rounded-full flex-shrink-0 mt-1.5"
-                style={{ backgroundColor: expandedVideo.color }}
-              />
-              <div className="min-w-0 flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 break-words">
-                  {expandedVideo.fullName}
-                </h3>
-                {expandedVideo.video.epoch !== null && (
-                  <span className="text-sm text-gray-500">
-                    Epoch {expandedVideo.video.epoch}
-                  </span>
-                )}
-              </div>
-            </div>
-            <button
-              onClick={() => setExpandedVideo(null)}
-              className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-amber-100 flex-shrink-0"
-            >
-              <X size={20} />
-            </button>
-          </div>
-
-          {/* Large video */}
-          <div className="p-4 flex items-center justify-center bg-gray-50">
-            <img
-              src={`/api/media/${expandedVideo.runId}/${expandedVideo.video.relative_path}`}
-              alt={expandedVideo.video.name}
-              className="max-w-full max-h-[600px] object-contain"
-            />
-          </div>
-
-          {/* Footer with video info */}
-          <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-sm text-gray-600 rounded-b-xl">
-            <span>{expandedVideo.video.name}</span>
-          </div>
-        </div>
-      )}
-
       {/* Side by side video comparison */}
       <div className="flex flex-wrap gap-4">
-        {currentVideos
-          .filter(({ runId, video }) => 
-            // Hide the video that is currently expanded
-            !(expandedVideo && expandedVideo.runId === runId && expandedVideo.video.path === video!.path)
+        {currentVideos.map(({ runId, video, color, displayName, fullName }) => {
+          const isExpanded =
+            expandedVideo &&
+            expandedVideo.runId === runId &&
+            expandedVideo.video.path === video!.path
+
+          if (isExpanded && expandedVideo) {
+            return (
+              <div key={`${runId}-${video?.path || 'none'}`} className="w-full">
+                <div className="bg-white border-2 border-amber-400 rounded-xl shadow-lg w-full mb-4">
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-4 p-4 border-b border-gray-200 bg-amber-50 rounded-t-xl">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <div 
+                        className="w-3 h-3 rounded-full flex-shrink-0 mt-1.5"
+                        style={{ backgroundColor: expandedVideo.color }}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900 break-words">
+                          {expandedVideo.fullName}
+                        </h3>
+                        {expandedVideo.video.epoch !== null && (
+                          <span className="text-sm text-gray-500">
+                            Epoch {expandedVideo.video.epoch}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setExpandedVideo(null)}
+                      className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-amber-100 flex-shrink-0"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+
+                  {/* Large video */}
+                  <div className="p-4 flex items-center justify-center bg-gray-50">
+                    <img
+                      src={`/api/media/${expandedVideo.runId}/${expandedVideo.video.relative_path}`}
+                      alt={expandedVideo.video.name}
+                      className="max-w-full max-h-[600px] object-contain"
+                    />
+                  </div>
+
+                  {/* Footer with video info */}
+                  <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-sm text-gray-600 rounded-b-xl">
+                    <span>{expandedVideo.video.name}</span>
+                  </div>
+                </div>
+              </div>
+            )
+          }
+
+          return (
+            <VideoCard
+              key={`${runId}-${video?.path || 'none'}`}
+              runId={runId}
+              video={video!}
+              color={color}
+              size={getVideoSize(runId)}
+              displayName={displayName}
+              fullName={fullName}
+              onResizeStart={createResizeHandler(runId)}
+              onExpand={() => setExpandedVideo({ runId, video: video!, color, fullName })}
+            />
           )
-          .map(({ runId, video, color, displayName, fullName }) => (
-          <VideoCard
-            key={runId}
-            runId={runId}
-            video={video!}
-            color={color}
-            size={getVideoSize(runId)}
-            displayName={displayName}
-            fullName={fullName}
-            onResizeStart={createResizeHandler(runId)}
-            onExpand={() => setExpandedVideo({ runId, video: video!, color, fullName })}
-          />
-        ))}
+        })}
       </div>
 
       {/* Timeline view - all epochs for all runs (collapsible per run) */}

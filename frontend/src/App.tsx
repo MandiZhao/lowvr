@@ -12,8 +12,6 @@ import {
   Video, 
   LayoutGrid, 
   RefreshCw,
-  ChevronLeft,
-  ChevronRight,
   Layers,
   Clock,
   Settings,
@@ -27,8 +25,6 @@ export default function App() {
   const { data: runs, isLoading, refetch, isRefetching } = useRuns()
   const { 
     selectedRunIds, 
-    sidebarCollapsed, 
-    toggleSidebar,
     viewMode,
     setViewMode,
     darkMode,
@@ -270,28 +266,14 @@ export default function App() {
         <aside 
           className={clsx(
             'border-r flex flex-col transition-all duration-200 flex-shrink-0 relative',
-            sidebarCollapsed ? 'w-12' : '',
             darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
           )}
-          style={{ width: sidebarCollapsed ? undefined : sidebarWidth }}
+          style={{ width: sidebarWidth }}
         >
-          <button
-            onClick={toggleSidebar}
-            className={clsx(
-              "p-3 transition-colors border-b",
-              darkMode 
-                ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700 border-gray-700" 
-                : "text-gray-400 hover:text-gray-700 hover:bg-gray-100 border-gray-200"
-            )}
-          >
-            {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-          </button>
-
-          {!sidebarCollapsed && (
-            <>
+          <>
               {/* Config Filter Panel */}
               {showConfigFilter && (
-                <div className="max-h-40 overflow-y-auto flex-shrink-0">
+                <div className="max-h-56 overflow-y-auto flex-shrink-0">
                   <ConfigFilter darkMode={darkMode} />
                 </div>
               )}
@@ -352,23 +334,20 @@ export default function App() {
                   )}
                 </div>
               )}
-            </>
-          )}
+          </>
 
           {/* Resize handle */}
-          {!sidebarCollapsed && (
-            <div
-              className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-amber-400 transition-colors group flex items-center justify-center"
-              onMouseDown={startResizing}
-            >
-              <div className={clsx(
-                'absolute right-0 w-4 h-12 flex items-center justify-center rounded-r bg-gray-200 opacity-0 group-hover:opacity-100 transition-opacity',
-                isResizing && 'opacity-100 bg-amber-400'
-              )}>
-                <GripVertical size={12} className="text-gray-500" />
-              </div>
+          <div
+            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-amber-400 transition-colors group flex items-center justify-center"
+            onMouseDown={startResizing}
+          >
+            <div className={clsx(
+              'absolute right-0 w-4 h-12 flex items-center justify-center rounded-r bg-gray-200 opacity-0 group-hover:opacity-100 transition-opacity',
+              isResizing && 'opacity-100 bg-amber-400'
+            )}>
+              <GripVertical size={12} className="text-gray-500" />
             </div>
-          )}
+          </div>
         </aside>
 
         {/* Main content */}

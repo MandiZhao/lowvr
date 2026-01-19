@@ -10,8 +10,9 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  ReferenceLine,
 } from 'recharts'
-import { Minus, Plus, Move, Settings, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, GripVertical, Move, Settings, X } from 'lucide-react'
 import clsx from 'clsx'
 
 interface Props {
@@ -32,7 +33,7 @@ interface YLimits {
 }
 
 export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
-  const { activeMetrics, hoveredRunId, runColors, toggleMetric } = useAppStore()
+  const { activeMetrics, hoveredRunId, runColors, toggleMetric, setActiveMetrics } = useAppStore()
   const { data: runs } = useRuns()
   const { data: metricsData, isLoading } = useMultiRunMetrics(runIds, activeMetrics.length > 0 ? activeMetrics : undefined)
   const lastMetricsDataRef = useRef<Map<string, Record<string, (number | null)[]>> | null>(null)
@@ -44,7 +45,7 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
     : lastMetricsDataRef.current
   
   // Global chart size controls
-  const [defaultHeight, setDefaultHeight] = useState(256)
+  const [defaultHeight] = useState(256)
   const [columns, setColumns] = useState(5)
   
   // Per-row size overrides (height and width weights)
@@ -60,6 +61,11 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
   
   // X-axis selection
   const [xAxisKey, setXAxisKey] = useState('_step')
+  const [hoveredXValue, setHoveredXValue] = useState<number | string | null>(null)
+  const [pinnedXValue, setPinnedXValue] = useState<number | string | null>(null)
+  const [pinnedColor, setPinnedColor] = useState('#f59e0b')
+  const [dragOverMetric, setDragOverMetric] = useState<string | null>(null)
+  const [draggingMetric, setDraggingMetric] = useState<string | null>(null)
 
   const normalizeRowSize = (size: RowSize | undefined, count: number): RowSize => {
     const widths = size?.widths && size.widths.length === count
@@ -176,6 +182,29 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
     return result
   }, [stableMetricsData, runIds, activeMetrics, xAxisKey])
 
+  const xAxisValueOptions = useMemo(() => {
+    const firstMetric = Object.keys(chartDataByMetric)[0]
+    if (!firstMetric) return []
+    const data = chartDataByMetric[firstMetric]
+    if (!data) return []
+    const values = new Set<number | string>()
+    data.forEach((point) => {
+      if (point.xValue !== null && point.xValue !== undefined) {
+        values.add(point.xValue)
+      }
+    })
+    const list = Array.from(values)
+    if (list.every((val) => typeof val === 'number')) {
+      return (list as number[]).sort((a, b) => a - b)
+    }
+    return list.sort((a, b) => String(a).localeCompare(String(b)))
+  }, [chartDataByMetric])
+
+  const pinnedIndex = useMemo(() => {
+    if (pinnedXValue === null) return -1
+    return xAxisValueOptions.findIndex((val) => val === pinnedXValue)
+  }, [xAxisValueOptions, pinnedXValue])
+
   // Compute data range for each metric
   const dataRanges = useMemo(() => {
     const ranges: Record<string, { min: number; max: number }> = {}
@@ -254,6 +283,19 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
     return { fullName, displayName }
   }
 
+  const reorderMetrics = (dragMetric: string, targetMetric: string) => {
+    if (dragMetric === targetMetric) return
+    const ordered = activeMetrics.filter((metric) => metric !== xAxisKey)
+    const fromIndex = ordered.indexOf(dragMetric)
+    const toIndex = ordered.indexOf(targetMetric)
+    if (fromIndex === -1 || toIndex === -1) return
+    const next = ordered.slice()
+    next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, dragMetric)
+    setActiveMetrics(next)
+  }
+
+
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || !payload.length) return null
     
@@ -269,7 +311,7 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
                 style={{ backgroundColor: entry.color }}
               />
               <span className="text-gray-700 flex-1" title={displayName}>
-                {displayName.length > 40 ? displayName.slice(0, 37) + '...' : displayName}
+                {displayName.length > 20 ? displayName.slice(0, 17) + '...' : displayName}
               </span>
               <span className="font-mono text-gray-900">
                 {formatTooltipValue(entry.value)}
@@ -281,9 +323,8 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
     )
   }
 
-  const visibleMetrics = activeMetrics.filter((metric) => {
+  const orderedMetrics = activeMetrics.filter((metric) => {
     if (metric === xAxisKey) return false
-    if (metric === expandedChart) return false
     const data = chartDataByMetric[metric]
     return data && data.length > 0
   })
@@ -294,8 +335,8 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
     : '100%'
 
   const rows: string[][] = []
-  for (let i = 0; i < visibleMetrics.length; i += columns) {
-    rows.push(visibleMetrics.slice(i, i + columns))
+  for (let i = 0; i < orderedMetrics.length; i += columns) {
+    rows.push(orderedMetrics.slice(i, i + columns))
   }
 
   return (
@@ -316,6 +357,92 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
 
         <div className="flex items-center gap-6 flex-wrap">
           <div className="flex items-center gap-2">
+            <span className={clsx("text-xs", darkMode ? "text-gray-400" : "text-gray-500")}>Pin</span>
+            <button
+              type="button"
+              onClick={() => {
+                if (xAxisValueOptions.length === 0) return
+                if (pinnedIndex <= 0) return
+                setPinnedXValue(xAxisValueOptions[pinnedIndex - 1])
+              }}
+              disabled={pinnedIndex <= 0}
+              className={clsx(
+                "p-1 rounded border text-xs",
+                darkMode
+                  ? "border-gray-600 text-gray-300 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                  : "border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              )}
+              title="Previous pinned step"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <select
+              value={pinnedXValue === null ? '' : String(pinnedXValue)}
+              onChange={(e) => {
+                const value = e.target.value
+                if (!value) {
+                  setPinnedXValue(null)
+                  return
+                }
+                const asNumber = Number(value)
+                setPinnedXValue(Number.isNaN(asNumber) ? value : asNumber)
+              }}
+              className={clsx(
+                "border rounded px-2 py-1 text-xs focus:outline-none focus:border-amber-500",
+                darkMode 
+                  ? "bg-gray-700 border-gray-600 text-gray-200" 
+                  : "bg-white border-gray-200 text-gray-700"
+              )}
+              title="Pin X value"
+            >
+              <option value="">Pin: none</option>
+              {xAxisValueOptions.map((val) => (
+                <option key={String(val)} value={String(val)}>
+                  {String(val)}
+                </option>
+              ))}
+            </select>
+            <label
+              className={clsx(
+                "h-6 w-6 rounded-full border flex items-center justify-center cursor-pointer",
+                darkMode ? "border-gray-600" : "border-gray-200"
+              )}
+              title="Pinned line color"
+            >
+              <span
+                className="h-3 w-3 rounded-full"
+                style={{ backgroundColor: pinnedColor }}
+              />
+              <input
+                type="color"
+                value={pinnedColor}
+                onChange={(e) => setPinnedColor(e.target.value)}
+                className="sr-only"
+                aria-label="Pinned line color"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                if (xAxisValueOptions.length === 0) return
+                if (pinnedIndex === -1) {
+                  setPinnedXValue(xAxisValueOptions[0])
+                  return
+                }
+                if (pinnedIndex >= xAxisValueOptions.length - 1) return
+                setPinnedXValue(xAxisValueOptions[pinnedIndex + 1])
+              }}
+              disabled={xAxisValueOptions.length === 0 || pinnedIndex >= xAxisValueOptions.length - 1}
+              className={clsx(
+                "p-1 rounded border text-xs",
+                darkMode
+                  ? "border-gray-600 text-gray-300 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                  : "border-gray-200 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+              )}
+              title="Next pinned step"
+            >
+              <ChevronRight size={14} />
+            </button>
             <span className={clsx("text-xs", darkMode ? "text-gray-400" : "text-gray-500")}>X-axis:</span>
             <select
               value={xAxisKey}
@@ -333,32 +460,6 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
                 </option>
               ))}
             </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Default H:</span>
-            <button
-              onClick={() => setDefaultHeight(Math.max(150, defaultHeight - 50))}
-              className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-            >
-              <Minus size={16} />
-            </button>
-            <input
-              type="range"
-              min="150"
-              max="500"
-              step="50"
-              value={defaultHeight}
-              onChange={(e) => setDefaultHeight(Number(e.target.value))}
-              className="w-16"
-            />
-            <button
-              onClick={() => setDefaultHeight(Math.min(500, defaultHeight + 50))}
-              className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-100"
-            >
-              <Plus size={16} />
-            </button>
-            <span className="text-xs text-gray-400 w-10">{defaultHeight}px</span>
           </div>
 
           <div className="flex items-center gap-1">
@@ -380,170 +481,200 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
         </div>
       </div>
 
-      {/* Expanded chart - inline full-width view (appears before grid) */}
-      {expandedChart && chartDataByMetric[expandedChart] && (() => {
-        const metric = expandedChart
-        const data = chartDataByMetric[metric]
-        const yLimits = getYLimits(metric)
-        const dataRange = dataRanges[metric]
-        
-        const yDomain: [number | 'auto', number | 'auto'] = [
-          yLimits.min === 'auto' ? 'auto' : yLimits.min,
-          yLimits.max === 'auto' ? 'auto' : yLimits.max
-        ]
+      <div className="space-y-4">
+        {rows.map((row, rowIndex) => {
+          const rowMetrics = row.filter((metric) => metric !== expandedChart)
+          const rowKey = rowMetrics.join('||')
+          const rowSize = normalizeRowSize(rowSizes[rowKey], rowMetrics.length)
+          const totalWeight = rowSize.widths.reduce((sum, w) => sum + w, 0)
 
-        return (
-          <div
-            className={clsx(
-              "border-2 rounded-xl shadow-lg w-full mb-4",
-              darkMode ? "bg-gray-900 border-amber-500/60" : "bg-white border-amber-400"
-            )}
-          >
-            {/* Header */}
-            <div className={clsx(
-              "flex items-center justify-between p-4 border-b rounded-t-xl",
-              darkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-amber-50"
-            )}>
-              <h3 className={clsx("text-lg font-semibold", darkMode ? "text-gray-100" : "text-gray-900")} title={metric}>
-                {metric}
-              </h3>
-              <button
-                onClick={() => setExpandedChart(null)}
-                className={clsx(
-                  "p-2 rounded-lg text-gray-400",
-                  darkMode ? "hover:text-gray-200 hover:bg-gray-700" : "hover:text-gray-600 hover:bg-amber-100"
-                )}
-              >
-                <X size={20} />
-              </button>
-            </div>
+          return (
+            <div key={`${rowKey}-${rowIndex}`} className="space-y-4">
+              {expandedChart && row.includes(expandedChart) && chartDataByMetric[expandedChart] && (() => {
+                const metric = expandedChart
+                const data = chartDataByMetric[metric]
+                const yLimits = getYLimits(metric)
+                const dataRange = dataRanges[metric]
+                
+                const yDomain: [number | 'auto', number | 'auto'] = [
+                  yLimits.min === 'auto' ? 'auto' : yLimits.min,
+                  yLimits.max === 'auto' ? 'auto' : yLimits.max
+                ]
 
-            {/* Settings panel */}
-            <div className={clsx(
-              "flex items-center gap-6 px-4 py-3 border-b text-sm",
-              darkMode ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"
-            )}>
-              <div className="flex items-center gap-2">
-                <span className={clsx(darkMode ? "text-gray-300" : "text-gray-500")}>Y Min:</span>
-                <input
-                  type="number"
-                  step="any"
-                  value={yLimits.min === 'auto' ? '' : yLimits.min}
-                  onChange={(e) => setYLimits(metric, { 
-                    min: e.target.value === '' ? 'auto' : parseFloat(e.target.value) 
-                  })}
-                  placeholder={dataRange ? dataRange.min.toFixed(2) : 'auto'}
-                  className={clsx(
-                    "w-24 border rounded px-2 py-1 text-sm focus:outline-none focus:border-amber-500",
-                    darkMode ? "border-gray-600 bg-gray-900 text-gray-200" : "border-gray-200 bg-white text-gray-800"
-                  )}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className={clsx(darkMode ? "text-gray-300" : "text-gray-500")}>Y Max:</span>
-                <input
-                  type="number"
-                  step="any"
-                  value={yLimits.max === 'auto' ? '' : yLimits.max}
-                  onChange={(e) => setYLimits(metric, { 
-                    max: e.target.value === '' ? 'auto' : parseFloat(e.target.value) 
-                  })}
-                  placeholder={dataRange ? dataRange.max.toFixed(2) : 'auto'}
-                  className={clsx(
-                    "w-24 border rounded px-2 py-1 text-sm focus:outline-none focus:border-amber-500",
-                    darkMode ? "border-gray-600 bg-gray-900 text-gray-200" : "border-gray-200 bg-white text-gray-800"
-                  )}
-                />
-              </div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={yLimits.logScale}
-                  onChange={(e) => setYLimits(metric, { logScale: e.target.checked })}
-                  className="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500"
-                />
-                <span className={clsx(darkMode ? "text-gray-300" : "text-gray-600")}>Log scale</span>
-              </label>
-              <button
-                onClick={() => setYLimits(metric, { min: 'auto', max: 'auto', logScale: false })}
-                className={clsx(
-                  "text-sm ml-auto",
-                  darkMode ? "text-gray-400 hover:text-amber-400" : "text-gray-400 hover:text-amber-600"
-                )}
-              >
-                Reset to auto
-              </button>
-            </div>
+                return (
+                  <div
+                    className={clsx(
+                      "border-2 rounded-xl shadow-lg w-full",
+                      darkMode ? "bg-gray-900 border-amber-500/60" : "bg-white border-amber-400"
+                    )}
+                  >
+                    {/* Header */}
+                    <div className={clsx(
+                      "flex items-center justify-between p-4 border-b rounded-t-xl",
+                      darkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-amber-50"
+                    )}>
+                      <h3 className={clsx("text-lg font-semibold", darkMode ? "text-gray-100" : "text-gray-900")} title={metric}>
+                        {metric}
+                      </h3>
+                      <button
+                        onClick={() => setExpandedChart(null)}
+                        className={clsx(
+                          "p-2 rounded-lg text-gray-400",
+                          darkMode ? "hover:text-gray-200 hover:bg-gray-700" : "hover:text-gray-600 hover:bg-amber-100"
+                        )}
+                      >
+                        <X size={20} />
+                      </button>
+                    </div>
 
-            {/* Large chart - explicit height for ResponsiveContainer */}
-            <div className="p-4" style={{ height: 500 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data}>
-                  <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#374151" : "#e5e7eb"} />
+                    {/* Settings panel */}
+                    <div className={clsx(
+                      "flex items-center gap-6 px-4 py-3 border-b text-sm",
+                      darkMode ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"
+                    )}>
+                      <div className="flex items-center gap-2">
+                        <span className={clsx(darkMode ? "text-gray-300" : "text-gray-500")}>Y Min:</span>
+                        <input
+                          type="number"
+                          step="any"
+                          value={yLimits.min === 'auto' ? '' : yLimits.min}
+                          onChange={(e) => setYLimits(metric, { 
+                            min: e.target.value === '' ? 'auto' : parseFloat(e.target.value) 
+                          })}
+                          placeholder={dataRange ? dataRange.min.toFixed(2) : 'auto'}
+                          className={clsx(
+                            "w-24 border rounded px-2 py-1 text-sm focus:outline-none focus:border-amber-500",
+                            darkMode ? "border-gray-600 bg-gray-900 text-gray-200" : "border-gray-200 bg-white text-gray-800"
+                          )}
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={clsx(darkMode ? "text-gray-300" : "text-gray-500")}>Y Max:</span>
+                        <input
+                          type="number"
+                          step="any"
+                          value={yLimits.max === 'auto' ? '' : yLimits.max}
+                          onChange={(e) => setYLimits(metric, { 
+                            max: e.target.value === '' ? 'auto' : parseFloat(e.target.value) 
+                          })}
+                          placeholder={dataRange ? dataRange.max.toFixed(2) : 'auto'}
+                          className={clsx(
+                            "w-24 border rounded px-2 py-1 text-sm focus:outline-none focus:border-amber-500",
+                            darkMode ? "border-gray-600 bg-gray-900 text-gray-200" : "border-gray-200 bg-white text-gray-800"
+                          )}
+                        />
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={yLimits.logScale}
+                          onChange={(e) => setYLimits(metric, { logScale: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500"
+                        />
+                        <span className={clsx(darkMode ? "text-gray-300" : "text-gray-600")}>Log scale</span>
+                      </label>
+                      <button
+                        onClick={() => setYLimits(metric, { min: 'auto', max: 'auto', logScale: false })}
+                        className={clsx(
+                          "text-sm ml-auto",
+                          darkMode ? "text-gray-400 hover:text-amber-400" : "text-gray-400 hover:text-amber-600"
+                        )}
+                      >
+                        Reset to auto
+                      </button>
+                    </div>
+
+                    {/* Large chart - explicit height for ResponsiveContainer */}
+                    <div className="p-4" style={{ height: 500 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={data}
+                    syncId="metrics-sync"
+                    onMouseMove={(e) => {
+                      if (e && e.activeLabel !== undefined && e.activeLabel !== null) {
+                        setHoveredXValue(e.activeLabel)
+                      }
+                    }}
+                    onMouseLeave={() => setHoveredXValue(null)}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#374151" : "#e5e7eb"} />
                   <XAxis
                     dataKey="xValue"
                     stroke="#9ca3af"
                     fontSize={12}
                     tickLine={false}
-                    label={{ 
-                      value: xAxisLabel, 
-                      position: 'insideBottom', 
-                      offset: -5,
-                      fontSize: 12,
-                      fill: '#9ca3af'
-                    }}
                   />
-                  <YAxis
-                    stroke="#9ca3af"
-                    fontSize={12}
-                    tickLine={false}
-                    width={56}
-                    domain={yDomain}
-                    scale={yLimits.logScale ? 'log' : 'auto'}
-                    tickFormatter={(value) => formatAxisTick(value, 4, 2)}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
+                    <YAxis
+                      stroke="#9ca3af"
+                      fontSize={12}
+                      tickLine={false}
+                      width={56}
+                      domain={yDomain}
+                      scale={yLimits.logScale ? 'log' : 'auto'}
+                      tickFormatter={(value) => formatAxisTick(value, 4, 2)}
+                    />
+                    {hoveredXValue !== null && (
+                      <ReferenceLine
+                        x={hoveredXValue}
+                        stroke={darkMode ? "#f59e0b" : "#f59e0b"}
+                        strokeWidth={1}
+                        strokeOpacity={0.6}
+                      />
+                    )}
+                    {pinnedXValue !== null && (
+                      <ReferenceLine
+                        x={pinnedXValue}
+                        stroke={pinnedColor}
+                        strokeWidth={2}
+                        strokeOpacity={0.9}
+                        label={
+                          hoveredXValue === pinnedXValue
+                            ? {
+                                value: `Pinned: ${pinnedXValue}`,
+                                position: 'top',
+                                fill: pinnedColor,
+                                fontSize: 11,
+                              }
+                            : undefined
+                        }
+                      />
+                    )}
+                    <Tooltip content={<CustomTooltip />} position={{ x: 12, y: 200 }} />
                   <Legend
-                    wrapperStyle={{ fontSize: '12px' }}
+                    wrapperStyle={{ fontSize: '12px', marginTop: 6 }}
                     formatter={(value, _entry, index) => {
                       const { fullName, displayName } = getLegendLabel(metric, value, index)
                       return <span title={fullName}>{displayName}</span>
                     }}
                   />
-                  {runIds.map((runId) => {
-                    const isHovered = hoveredRunId === runId
-                    const isDimmed = hoveredRunId !== null && !isHovered
-                    return (
-                      <Line
-                        key={runId}
-                        type="monotone"
-                        dataKey={runId}
-                        name={runId}
-                        stroke={getRunColor(runId, runColors)}
-                        strokeWidth={isHovered ? 4 : isDimmed ? 1 : 2}
-                        strokeOpacity={isDimmed ? 0.3 : 1}
-                        dot={false}
-                        connectNulls
-                        isAnimationActive={false}
-                      />
-                    )
-                  })}
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )
-      })()}
+                          {runIds.map((runId) => {
+                            const isHovered = hoveredRunId === runId
+                            const isDimmed = hoveredRunId !== null && !isHovered
+                            return (
+                              <Line
+                                key={runId}
+                                type="monotone"
+                                dataKey={runId}
+                                name={runId}
+                                stroke={getRunColor(runId, runColors)}
+                                strokeWidth={isHovered ? 4 : isDimmed ? 1 : 2}
+                                strokeOpacity={isDimmed ? 0.3 : 1}
+                                dot={false}
+                                connectNulls
+                                isAnimationActive={false}
+                              />
+                            )
+                          })}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )
+              })()}
 
-      <div className="space-y-4">
-        {rows.map((row, rowIndex) => {
-          const rowKey = row.join('||')
-          const rowSize = normalizeRowSize(rowSizes[rowKey], row.length)
-          const totalWeight = rowSize.widths.reduce((sum, w) => sum + w, 0)
-
-          return (
-            <div key={`${rowKey}-${rowIndex}`} className="flex gap-4 items-start" data-row={rowKey}>
-              {row.map((metric, index) => {
+              {rowMetrics.length > 0 && (
+              <div className="flex gap-4 items-start" data-row={rowKey}>
+              {rowMetrics.map((metric, index) => {
                 const data = chartDataByMetric[metric]
                 if (!data || data.length === 0) return null
 
@@ -564,10 +695,13 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
                   <div
                     key={metric}
                     className={clsx(
-                      "rounded-lg p-4 shadow-sm relative group border",
+                      "rounded-lg p-4 pt-6 shadow-sm relative group border transition-all duration-150",
                       darkMode 
                         ? "bg-gray-800 border-gray-700" 
-                        : "bg-white border-gray-200"
+                        : "bg-white border-gray-200",
+                      draggingMetric && draggingMetric !== metric && "opacity-90",
+                      draggingMetric === metric && "opacity-70 scale-[0.98]",
+                      dragOverMetric === metric && "scale-[1.02]"
                     )}
                     style={{
                       flex: row.length === 1 ? `0 0 ${singleWidth}` : `${widthWeight} 1 0`,
@@ -575,7 +709,48 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
                       minWidth: 0,
                     }}
                     data-panel
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      setDragOverMetric(metric)
+                    }}
+                    onDragLeave={(e) => {
+                      const related = e.relatedTarget as Node | null
+                      if (related && e.currentTarget.contains(related)) return
+                      setDragOverMetric((prev) => (prev === metric ? null : prev))
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      const dragMetric = e.dataTransfer.getData('text/plain')
+                      if (dragMetric) reorderMetrics(dragMetric, metric)
+                      setDragOverMetric(null)
+                      setDraggingMetric(null)
+                    }}
                   >
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2">
+                      <button
+                        type="button"
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.effectAllowed = 'move'
+                          e.dataTransfer.setData('text/plain', metric)
+                          setDraggingMetric(metric)
+                        }}
+                        onDragEnd={() => {
+                          setDraggingMetric(null)
+                          setDragOverMetric(null)
+                        }}
+                        className={clsx(
+                          "p-1 cursor-grab active:cursor-grabbing",
+                          darkMode ? "text-gray-500 hover:text-gray-200" : "text-gray-400 hover:text-gray-600"
+                        )}
+                        title="Drag to reorder"
+                      >
+                        <GripVertical size={12} />
+                      </button>
+                    </div>
+                    {dragOverMetric === metric && (
+                      <div className="absolute inset-0 rounded-lg ring-2 ring-amber-400 bg-amber-400/10 pointer-events-none" />
+                    )}
                     <div className="flex items-center justify-between mb-2">
                       <h3 className={clsx(
                         "text-sm font-medium truncate flex-1",
@@ -614,21 +789,23 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
 
                     <div ref={registerChartWidth(metric)} style={{ height: rowSize.height }}>
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={data}>
+                        <LineChart
+                          data={data}
+                          syncId="metrics-sync"
+                          onMouseMove={(e) => {
+                            if (e && e.activeLabel !== undefined && e.activeLabel !== null) {
+                              setHoveredXValue(e.activeLabel)
+                            }
+                          }}
+                          onMouseLeave={() => setHoveredXValue(null)}
+                        >
                           <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#374151" : "#e5e7eb"} />
                           <XAxis
                             dataKey="xValue"
                             stroke="#9ca3af"
                             fontSize={11}
                             tickLine={false}
-                            label={{ 
-                              value: xAxisLabel, 
-                              position: 'insideBottom', 
-                              offset: -5,
-                              fontSize: 10,
-                              fill: '#9ca3af'
-                            }}
-                          />
+                        />
                           <YAxis
                             stroke="#9ca3af"
                             fontSize={11}
@@ -638,9 +815,35 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
                             scale={yLimits.logScale ? 'log' : 'auto'}
                             tickFormatter={(value) => formatAxisTick(value, 3, 1)}
                           />
-                          <Tooltip content={<CustomTooltip />} />
+                          {hoveredXValue !== null && (
+                            <ReferenceLine
+                              x={hoveredXValue}
+                              stroke={darkMode ? "#f59e0b" : "#f59e0b"}
+                              strokeWidth={1}
+                              strokeOpacity={0.6}
+                            />
+                          )}
+                          {pinnedXValue !== null && (
+                            <ReferenceLine
+                              x={pinnedXValue}
+                              stroke={pinnedColor}
+                              strokeWidth={2}
+                              strokeOpacity={0.9}
+                              label={
+                                hoveredXValue === pinnedXValue
+                                  ? {
+                                      value: `Pinned: ${pinnedXValue}`,
+                                      position: 'top',
+                                      fill: pinnedColor,
+                                      fontSize: 10,
+                                    }
+                                  : undefined
+                              }
+                            />
+                          )}
+                          <Tooltip content={<CustomTooltip />} position={{ x: 12, y: 160 }} />
                           <Legend
-                            wrapperStyle={{ fontSize: '10px' }}
+                            wrapperStyle={{ fontSize: '10px', marginTop: 6 }}
                             formatter={(value, _entry, index) => {
                               const { fullName, displayName } = getLegendLabel(metric, value, index)
                               return (
@@ -744,8 +947,10 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
                       <Move size={14} />
                     </div>
                   </div>
-                )
-              })}
+                  )
+                })}
+              </div>
+              )}
             </div>
           )
         })}
