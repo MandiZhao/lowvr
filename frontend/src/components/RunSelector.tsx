@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Run } from '../hooks/useRuns'
 import { useAppStore, getRunColor } from '../stores/appStore'
-import { Search, Check, X, GripVertical, Trash2, Square } from 'lucide-react'
+import { Search, Check, X, GripVertical, Trash2 } from 'lucide-react'
 import clsx from 'clsx'
 import ColorPicker from './ColorPicker'
 
@@ -108,8 +108,6 @@ export default function RunSelector({ runs, isLoading, darkMode = false }: Props
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
   
   // Stop confirmation state
-  const [stopConfirm, setStopConfirm] = useState<{ id: string; name: string } | null>(null)
-  const [isStopping, setIsStopping] = useState(false)
   
   // Color picker state
   const [colorPickerRunId, setColorPickerRunId] = useState<string | null>(null)
@@ -191,24 +189,6 @@ export default function RunSelector({ runs, isLoading, darkMode = false }: Props
     }
   }, [colorPickerRunId])
   
-  const handleStopRun = async (runId: string) => {
-    setIsStopping(true)
-    try {
-      const res = await fetch(`/api/runs/${runId}/stop`, { method: 'POST' })
-      if (res.ok) {
-        setStopConfirm(null)
-        // Invalidate runs query to refetch and update state
-        await queryClient.invalidateQueries({ queryKey: ['runs'] })
-      } else {
-        const error = await res.json()
-        alert(`Failed to stop: ${error.detail || 'Unknown error'}`)
-      }
-    } catch (err) {
-      alert(`Failed to stop: ${err}`)
-    } finally {
-      setIsStopping(false)
-    }
-  }
   
   const filteredRuns = useMemo(() => {
     const filtered = runs.filter((run) => {
@@ -288,6 +268,45 @@ export default function RunSelector({ runs, isLoading, darkMode = false }: Props
 
   return (
     <div className="flex flex-col h-full relative">
+      {/* Column headers */}
+      <div className="flex border-b border-gray-200 bg-gray-100 text-xs flex-shrink-0">
+        <div 
+          className={clsx(
+            "px-2 py-1.5 font-medium text-gray-600",
+            hasConfigColumns ? "flex-shrink-0" : "flex-1"
+          )}
+          style={hasConfigColumns ? { width: runColumnWidth } : undefined}
+        >
+          Run
+        </div>
+        {hasConfigColumns && (
+          <>
+            {/* Resize handle */}
+            <div
+              className="w-1 bg-gray-200 cursor-col-resize hover:bg-amber-400 flex items-center justify-center"
+              onMouseDown={startResizing}
+            >
+              <GripVertical size={10} className="text-gray-400" />
+            </div>
+            {configDisplayKeys.map(key => (
+              <div 
+                key={key} 
+                className="flex-1 min-w-[60px] px-1 py-1.5 font-medium text-gray-600 text-center border-l border-gray-200 flex items-center justify-between"
+                title={key}
+              >
+                <span className="truncate flex-1 text-xs">{shortKey(key)}</span>
+                <button
+                  onClick={() => removeConfigDisplayKey(key)}
+                  className="p-0.5 text-gray-400 hover:text-red-500 flex-shrink-0"
+                >
+                  <X size={10} />
+                </button>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+
       {/* Search */}
       <div className={clsx(
         "p-2 border-b flex-shrink-0",
@@ -363,47 +382,8 @@ export default function RunSelector({ runs, isLoading, darkMode = false }: Props
         </div>
       </div>
 
-      {/* Column headers */}
-      <div className="flex border-b border-gray-200 bg-gray-100 text-xs flex-shrink-0">
-        <div 
-          className={clsx(
-            "px-2 py-1.5 font-medium text-gray-600",
-            hasConfigColumns ? "flex-shrink-0" : "flex-1"
-          )}
-          style={hasConfigColumns ? { width: runColumnWidth } : undefined}
-        >
-          Run
-        </div>
-        {hasConfigColumns && (
-          <>
-            {/* Resize handle */}
-            <div
-              className="w-1 bg-gray-200 cursor-col-resize hover:bg-amber-400 flex items-center justify-center"
-              onMouseDown={startResizing}
-            >
-              <GripVertical size={10} className="text-gray-400" />
-            </div>
-            {configDisplayKeys.map(key => (
-              <div 
-                key={key} 
-                className="flex-1 min-w-[60px] px-1 py-1.5 font-medium text-gray-600 text-center border-l border-gray-200 flex items-center justify-between"
-                title={key}
-              >
-                <span className="truncate flex-1 text-xs">{shortKey(key)}</span>
-                <button
-                  onClick={() => removeConfigDisplayKey(key)}
-                  className="p-0.5 text-gray-400 hover:text-red-500 flex-shrink-0"
-                >
-                  <X size={10} />
-                </button>
-              </div>
-            ))}
-          </>
-        )}
-      </div>
-
       {/* Run list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto overflow-x-auto">
         <div className={clsx(
           "divide-y",
           darkMode ? "divide-gray-700" : "divide-gray-100"
@@ -416,6 +396,7 @@ export default function RunSelector({ runs, isLoading, darkMode = false }: Props
                 key={run.id}
                 className={clsx(
                   'flex transition-colors group/row',
+                  hasConfigColumns && 'min-w-max',
                   isSelected 
                     ? (darkMode ? 'bg-amber-900/30' : 'bg-amber-50')
                     : (darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'),
@@ -502,16 +483,6 @@ export default function RunSelector({ runs, isLoading, darkMode = false }: Props
                       {run.display_name}
                     </p>
                     
-                    {/* Running badge */}
-                    {run.state === 'running' && (
-                      <span className={clsx(
-                        "text-[9px] px-0.5 rounded flex-shrink-0 animate-pulse",
-                        darkMode ? "bg-green-900 text-green-400" : "bg-green-100 text-green-600"
-                      )}>
-                        running
-                      </span>
-                    )}
-                    
                     {/* Video badge */}
                     {run.has_videos && (
                       <span className={clsx(
@@ -522,20 +493,6 @@ export default function RunSelector({ runs, isLoading, darkMode = false }: Props
                       </span>
                     )}
                   </div>
-
-                  {/* Stop button - only for running runs */}
-                  {run.state === 'running' && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setStopConfirm({ id: run.id, name: run.display_name })
-                      }}
-                      className="p-0.5 rounded text-orange-400 hover:text-orange-600 hover:bg-orange-50 opacity-0 group-hover/row:opacity-100 transition-all flex-shrink-0"
-                      title="Stop run"
-                    >
-                      <Square size={12} fill="currentColor" />
-                    </button>
-                  )}
 
                   {/* Delete button - appears on hover */}
                   <button
@@ -637,41 +594,6 @@ export default function RunSelector({ runs, isLoading, darkMode = false }: Props
         </div>
       )}
 
-      {/* Stop confirmation dialog */}
-      {stopConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Stop Run?
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
-              This will send a termination signal (SIGTERM) to the training process.
-            </p>
-            <p className="text-xs text-gray-500 bg-gray-100 rounded p-2 mb-4 truncate" title={stopConfirm.name}>
-              {stopConfirm.name}
-            </p>
-            <p className="text-xs text-orange-600 mb-4">
-              The process will be gracefully stopped. Your training script can handle cleanup if it catches SIGTERM.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setStopConfirm(null)}
-                disabled={isStopping}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleStopRun(stopConfirm.id)}
-                disabled={isStopping}
-                className="px-4 py-2 text-sm bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors disabled:opacity-50"
-              >
-                {isStopping ? 'Stopping...' : 'Stop'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Bulk delete confirmation dialog */}
       {bulkDeleteConfirm && (

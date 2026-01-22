@@ -33,7 +33,7 @@ interface YLimits {
 }
 
 export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
-  const { activeMetrics, hoveredRunId, runColors, toggleMetric, setActiveMetrics } = useAppStore()
+  const { activeMetrics, hoveredRunId, runColors, toggleMetric, setActiveMetrics, xAxisKey, setXAxisKey } = useAppStore()
   const { data: runs } = useRuns()
   const { data: metricsData, isLoading } = useMultiRunMetrics(runIds, activeMetrics.length > 0 ? activeMetrics : undefined)
   const lastMetricsDataRef = useRef<Map<string, Record<string, (number | null)[]>> | null>(null)
@@ -60,7 +60,6 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
   const [expandedChart, setExpandedChart] = useState<string | null>(null)
   
   // X-axis selection
-  const [xAxisKey, setXAxisKey] = useState('_step')
   const [hoveredXValue, setHoveredXValue] = useState<number | string | null>(null)
   const [pinnedXValue, setPinnedXValue] = useState<number | string | null>(null)
   const [pinnedColor, setPinnedColor] = useState('#f59e0b')
@@ -504,14 +503,14 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
                 return (
                   <div
                     className={clsx(
-                      "border-2 rounded-xl shadow-lg w-full",
-                      darkMode ? "bg-gray-900 border-amber-500/60" : "bg-white border-amber-400"
+                      "rounded-xl shadow-md w-full",
+                      darkMode ? "bg-gray-900" : "bg-[#fffdf8]"
                     )}
                   >
                     {/* Header */}
                     <div className={clsx(
-                      "flex items-center justify-between p-4 border-b rounded-t-xl",
-                      darkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-amber-50"
+                      "flex items-center justify-between p-4 rounded-t-xl",
+                      darkMode ? "bg-gray-800" : "bg-transparent"
                     )}>
                       <h3 className={clsx("text-lg font-semibold", darkMode ? "text-gray-100" : "text-gray-900")} title={metric}>
                         {metric}
@@ -529,8 +528,8 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
 
                     {/* Settings panel */}
                     <div className={clsx(
-                      "flex items-center gap-6 px-4 py-3 border-b text-sm",
-                      darkMode ? "bg-gray-800 border-gray-700" : "bg-gray-50 border-gray-200"
+                      "flex items-center gap-6 px-4 py-3 text-sm",
+                      darkMode ? "bg-gray-800" : "bg-transparent"
                     )}>
                       <div className="flex items-center gap-2">
                         <span className={clsx(darkMode ? "text-gray-300" : "text-gray-500")}>Y Min:</span>
@@ -639,7 +638,11 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
                         }
                       />
                     )}
-                    <Tooltip content={<CustomTooltip />} position={{ x: 12, y: 200 }} />
+                    <Tooltip
+                      content={<CustomTooltip />}
+                      position={{ x: 12, y: 200 }}
+                      wrapperStyle={{ zIndex: 30, pointerEvents: 'none' }}
+                    />
                   <Legend
                     wrapperStyle={{ fontSize: '12px', marginTop: 6 }}
                     formatter={(value, _entry, index) => {
@@ -695,10 +698,10 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
                   <div
                     key={metric}
                     className={clsx(
-                      "rounded-lg p-4 pt-6 shadow-sm relative group border transition-all duration-150",
+                      "rounded-xl p-4 pt-6 shadow-md relative group transition-all duration-150",
                       darkMode 
-                        ? "bg-gray-800 border-gray-700" 
-                        : "bg-white border-gray-200",
+                        ? "bg-gray-800" 
+                        : "bg-[#fffdf8]",
                       draggingMetric && draggingMetric !== metric && "opacity-90",
                       draggingMetric === metric && "opacity-70 scale-[0.98]",
                       dragOverMetric === metric && "scale-[1.02]"
@@ -745,7 +748,7 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
                         )}
                         title="Drag to reorder"
                       >
-                        <GripVertical size={12} />
+                        <GripVertical size={12} className="rotate-90" />
                       </button>
                     </div>
                     {dragOverMetric === metric && (
@@ -841,7 +844,11 @@ export default function ComparisonCharts({ runIds, darkMode = false }: Props) {
                               }
                             />
                           )}
-                          <Tooltip content={<CustomTooltip />} position={{ x: 12, y: 160 }} />
+                          <Tooltip
+                            content={<CustomTooltip />}
+                            position={{ x: 12, y: 160 }}
+                            wrapperStyle={{ zIndex: 30, pointerEvents: 'none' }}
+                          />
                           <Legend
                             wrapperStyle={{ fontSize: '10px', marginTop: 6 }}
                             formatter={(value, _entry, index) => {

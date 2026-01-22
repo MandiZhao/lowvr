@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useRuns, Video } from '../hooks/useRuns'
 import { useQuery } from '@tanstack/react-query'
-import { Play, Pause, ChevronLeft, ChevronRight, Minus, Plus, Move, ChevronDown, ChevronUp, Maximize2, X } from 'lucide-react'
+import { Download, Play, Pause, ChevronLeft, ChevronRight, Minus, Plus, Move, ChevronDown, ChevronUp, Maximize2, X } from 'lucide-react'
 import clsx from 'clsx'
 import { useAppStore, getRunColor } from '../stores/appStore'
 
@@ -38,31 +38,47 @@ function VideoCard({
         className="absolute inset-0 rounded-lg opacity-10"
         style={{ backgroundColor: color }}
       />
-      <div className="relative bg-white rounded-lg overflow-hidden border border-gray-200 shadow-sm">
+      <div className="relative bg-[#fffdf8] rounded-xl overflow-hidden shadow-md">
         <div className="aspect-square relative">
-          <img
-            src={mediaUrl}
-            alt={video.name}
-            className={clsx(
-              'w-full h-full object-contain bg-gray-50',
-              !isPlaying && 'pause-animation'
-            )}
-            style={{
-              animationPlayState: isPlaying ? 'running' : 'paused',
-            }}
-          />
+          <a
+            href={mediaUrl}
+            download={video.filename}
+            target="_blank"
+            rel="noreferrer"
+            title="Click to download"
+            className="block"
+          >
+            <img
+              src={mediaUrl}
+              alt={video.name}
+              className={clsx(
+                'w-full h-full object-contain bg-gray-50',
+                !isPlaying && 'pause-animation'
+              )}
+              style={{
+                animationPlayState: isPlaying ? 'running' : 'paused',
+              }}
+            />
+          </a>
           
           {/* Play/Pause overlay */}
-          <button
-            onClick={() => setIsPlaying(!isPlaying)}
-            className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            {isPlaying ? (
-              <Pause size={24} className="text-white" />
-            ) : (
-              <Play size={24} className="text-white" />
-            )}
-          </button>
+          <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setIsPlaying(!isPlaying)
+              }}
+              className="pointer-events-auto"
+              title={isPlaying ? 'Pause' : 'Play'}
+            >
+              {isPlaying ? (
+                <Pause size={24} className="text-white" />
+              ) : (
+                <Play size={24} className="text-white" />
+              )}
+            </button>
+          </div>
 
           {/* Expand button - top-right corner */}
           {onExpand && (
@@ -77,6 +93,18 @@ function VideoCard({
               <Maximize2 size={14} />
             </button>
           )}
+
+          <a
+            href={mediaUrl}
+            download={video.filename}
+            target="_blank"
+            rel="noreferrer"
+            className="absolute top-1 left-1 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity text-white hover:text-amber-300 bg-black/40 hover:bg-black/60"
+            title="Download GIF"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Download size={14} />
+          </a>
         </div>
         
         <div className="px-2 py-1.5 text-xs bg-gray-50">
@@ -339,9 +367,9 @@ export default function VideoGallery({ runIds, darkMode: _darkMode = false }: Pr
           if (isExpanded && expandedVideo) {
             return (
               <div key={`${runId}-${video?.path || 'none'}`} className="w-full">
-                <div className="bg-white border-2 border-amber-400 rounded-xl shadow-lg w-full mb-4">
+                <div className="bg-[#fffdf8] rounded-xl shadow-md w-full mb-4">
                   {/* Header */}
-                  <div className="flex items-start justify-between gap-4 p-4 border-b border-gray-200 bg-amber-50 rounded-t-xl">
+                  <div className="flex items-start justify-between gap-4 p-4 rounded-t-xl">
                     <div className="flex items-start gap-3 min-w-0 flex-1">
                       <div 
                         className="w-3 h-3 rounded-full flex-shrink-0 mt-1.5"
@@ -367,16 +395,36 @@ export default function VideoGallery({ runIds, darkMode: _darkMode = false }: Pr
                   </div>
 
                   {/* Large video */}
-                  <div className="p-4 flex items-center justify-center bg-gray-50">
-                    <img
-                      src={`/api/media/${expandedVideo.runId}/${expandedVideo.video.relative_path}`}
-                      alt={expandedVideo.video.name}
-                      className="max-w-full max-h-[600px] object-contain"
-                    />
+                  <div className="p-4 flex items-center justify-center bg-transparent relative">
+                    <a
+                      href={`/api/media/${expandedVideo.runId}/${expandedVideo.video.relative_path}`}
+                      download={expandedVideo.video.filename}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Click to download"
+                      className="block"
+                    >
+                      <img
+                        src={`/api/media/${expandedVideo.runId}/${expandedVideo.video.relative_path}`}
+                        alt={expandedVideo.video.name}
+                        className="max-w-full max-h-[600px] object-contain"
+                      />
+                    </a>
+                    <a
+                      href={`/api/media/${expandedVideo.runId}/${expandedVideo.video.relative_path}`}
+                      download={expandedVideo.video.filename}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="absolute top-3 left-3 p-2 rounded text-gray-600 hover:text-amber-600 bg-white/90 hover:bg-white shadow"
+                      title="Download GIF"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Download size={16} />
+                    </a>
                   </div>
 
                   {/* Footer with video info */}
-                  <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 text-sm text-gray-600 rounded-b-xl">
+                  <div className="px-4 py-3 text-sm text-gray-600 rounded-b-xl">
                     <span>{expandedVideo.video.name}</span>
                   </div>
                 </div>
@@ -440,6 +488,74 @@ export default function VideoGallery({ runIds, darkMode: _darkMode = false }: Pr
                     <div className="flex gap-2 overflow-x-auto pb-2">
                       {videos.map((video) => {
                         const { displayName, fullName } = getNames(runId)
+                        const isExpandedVideo =
+                          expandedVideo &&
+                          expandedVideo.runId === runId &&
+                          expandedVideo.video.path === video.path
+
+                        if (isExpandedVideo && expandedVideo) {
+                          return (
+                            <div key={video.path} className="min-w-[240px]">
+                              <div className="bg-[#fffdf8] rounded-xl shadow-md w-full mb-2">
+                                <div className="flex items-start justify-between gap-4 p-3 rounded-t-xl">
+                                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                                    <div 
+                                      className="w-3 h-3 rounded-full flex-shrink-0 mt-1"
+                                      style={{ backgroundColor: color }}
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                      <h3 className="text-sm font-semibold text-gray-900 break-words">
+                                        {fullName}
+                                      </h3>
+                                      {video.epoch !== null && (
+                                        <span className="text-xs text-gray-500">
+                                          Epoch {video.epoch}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => setExpandedVideo(null)}
+                                    className="p-1 rounded text-gray-400 hover:text-gray-600 hover:bg-amber-100 flex-shrink-0"
+                                  >
+                                    <X size={16} />
+                                  </button>
+                                </div>
+                                <div className="p-3 flex items-center justify-center bg-transparent relative">
+                                  <a
+                                    href={`/api/media/${runId}/${video.relative_path}`}
+                                    download={video.filename}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    title="Click to download"
+                                    className="block"
+                                  >
+                                    <img
+                                      src={`/api/media/${runId}/${video.relative_path}`}
+                                      alt={video.name}
+                                      className="max-w-full max-h-[240px] object-contain"
+                                    />
+                                  </a>
+                                  <a
+                                    href={`/api/media/${runId}/${video.relative_path}`}
+                                    download={video.filename}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="absolute top-2 left-2 p-1.5 rounded text-gray-600 hover:text-amber-600 bg-white/90 hover:bg-white shadow"
+                                    title="Download GIF"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <Download size={14} />
+                                  </a>
+                                </div>
+                                <div className="px-3 py-2 text-xs text-gray-600 rounded-b-xl">
+                                  <span>{video.name}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        }
+
                         return (
                           <VideoCard
                             key={video.path}
@@ -449,6 +565,7 @@ export default function VideoGallery({ runIds, darkMode: _darkMode = false }: Pr
                             size={120}
                             displayName={displayName}
                             fullName={fullName}
+                            onExpand={() => setExpandedVideo({ runId, video, color, fullName })}
                           />
                         )
                       })}

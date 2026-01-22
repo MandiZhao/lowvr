@@ -14,7 +14,6 @@ import {
   RefreshCw,
   Layers,
   Clock,
-  Settings,
   GripVertical,
   Sun,
   Moon
@@ -31,15 +30,14 @@ export default function App() {
     toggleDarkMode
   } = useAppStore()
   const [showRunSets, setShowRunSets] = useState(false)
-  const [showConfigFilter, setShowConfigFilter] = useState(true)
-  const [showMetrics, setShowMetrics] = useState(true)
-  const [metricsHeight, setMetricsHeight] = useState(260)
-  const [isResizingMetrics, setIsResizingMetrics] = useState(false)
+  const [showConfigFilter, setShowConfigFilter] = useState(false)
+  const [showMetrics, setShowMetrics] = useState(false)
+  const [metricsHeight] = useState(260)
   
   // Resizable sidebar
   const [sidebarWidth, setSidebarWidth] = useState(450)
   const [isResizing, setIsResizing] = useState(false)
-  
+
   // Auto-refresh state
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [refreshInterval, setRefreshInterval] = useState(30) // seconds
@@ -54,7 +52,7 @@ export default function App() {
     
     return () => clearInterval(interval)
   }, [autoRefresh, refreshInterval, refetch])
-
+  
   // Sidebar resize handlers
   const startResizing = useCallback(() => {
     setIsResizing(true)
@@ -87,19 +85,22 @@ export default function App() {
   return (
     <div className={clsx(
       "h-screen flex flex-col overflow-hidden transition-colors",
-      darkMode ? "bg-gray-900 text-gray-100" : "bg-white text-gray-900"
+      darkMode ? "bg-gray-900 text-gray-100" : "bg-[#f7f2ea] text-gray-900"
     )}>
       {/* Header */}
       <header className={clsx(
-        "h-16 border-b flex items-center justify-between px-4 flex-shrink-0 transition-colors",
-        darkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"
+        "flex items-center px-4 pt-3 pb-2 flex-shrink-0 transition-colors",
+        darkMode ? "bg-gray-900" : "bg-[#f7f2ea]"
       )}>
-        <div className="flex items-center gap-3">
-          {/* View mode toggle */}
-          <div className={clsx(
-            "flex items-center rounded-lg p-1 border shadow-sm h-10",
-            darkMode ? "bg-gray-700 border-gray-600" : "bg-white border-gray-200"
-          )}>
+        <div className={clsx(
+          "flex items-center justify-between w-full rounded-2xl px-4 py-3 shadow-sm",
+          darkMode ? "bg-gray-800" : "bg-[#fffdf8]"
+        )}>
+          <div className="flex items-center gap-3">
+            <div className={clsx(
+              "flex items-center rounded-lg p-1 shadow-sm h-10",
+              darkMode ? "bg-gray-700" : "bg-white"
+            )}>
             <button
               onClick={() => setViewMode('charts')}
               className={clsx(
@@ -146,66 +147,42 @@ export default function App() {
               <span>Both</span>
             </button>
           </div>
-
-          {/* Run Sets button */}
           <button
             onClick={() => setShowRunSets(!showRunSets)}
             className={clsx(
-              'px-3 h-10 rounded-lg transition-colors border flex items-center gap-2 text-sm font-medium',
+              'px-3 h-10 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium',
               showRunSets
-                ? 'bg-amber-100 text-amber-700 border-amber-300'
-                : 'text-gray-500 hover:text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                ? 'bg-amber-100 text-amber-700'
+                : darkMode
+                  ? 'text-gray-300 hover:text-gray-100 hover:bg-gray-700'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-white'
             )}
             title="Saved run sets"
           >
             <Layers size={18} />
             <span>Run Sets</span>
           </button>
+          </div>
 
-          {/* Config Filter button */}
-          <button
-            onClick={() => setShowConfigFilter(!showConfigFilter)}
-            className={clsx(
-              'px-3 h-10 rounded-lg transition-colors border flex items-center gap-2 text-sm font-medium',
-              showConfigFilter
-                ? 'bg-amber-100 text-amber-700 border-amber-300'
-                : 'text-gray-500 hover:text-gray-700 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-            )}
-            title="Filter by config"
-          >
-            <Settings size={18} />
-            <span>Config</span>
-          </button>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <h1 className={clsx(
-            "text-2xl font-semibold flex items-center gap-2 h-10",
-            darkMode ? "text-gray-100" : "text-gray-900"
-          )}>
-            <img 
-              src="/lowvr-2d.png" 
-              alt="lowvr logo" 
-              className="w-10 h-10 object-contain"
-            />
-            lowvr
-          </h1>
-          <span className={clsx(
-            "text-sm px-2 rounded h-10 inline-flex items-center",
-            darkMode ? "text-gray-400 bg-gray-700" : "text-gray-500 bg-gray-200"
-          )}>
-            {runs?.length || 0} runs
-          </span>
-
+          <div className="flex items-center gap-3">
+            <span className={clsx(
+              "text-sm px-2 rounded h-10 inline-flex items-center",
+              darkMode ? "text-gray-400 bg-gray-700" : "text-gray-500 bg-white"
+            )}>
+              {runs?.length || 0} runs
+            </span>
           {/* Auto-refresh controls */}
-          <div className="flex items-center gap-1 border border-gray-200 rounded-lg px-2 h-10 bg-white">
+          <div className={clsx(
+            "flex items-center gap-1 rounded-lg px-2 h-10",
+            darkMode ? "bg-gray-700" : "bg-white"
+          )}>
             <button
               onClick={() => setAutoRefresh(!autoRefresh)}
               className={clsx(
                 'p-1.5 rounded transition-colors flex items-center gap-1 text-sm h-8 w-8 justify-center',
                 autoRefresh
                   ? 'text-green-600'
-                  : 'text-gray-400 hover:text-gray-700'
+                  : darkMode ? 'text-gray-400 hover:text-gray-200' : 'text-gray-400 hover:text-gray-700'
               )}
               title={autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
             >
@@ -215,7 +192,10 @@ export default function App() {
               <select
                 value={refreshInterval}
                 onChange={(e) => setRefreshInterval(Number(e.target.value))}
-                className="bg-transparent text-xs text-gray-600 focus:outline-none h-8"
+                className={clsx(
+                  "bg-transparent text-xs focus:outline-none h-8",
+                  darkMode ? "text-gray-300" : "text-gray-600"
+                )}
               >
                 <option value={10}>10s</option>
                 <option value={30}>30s</option>
@@ -225,29 +205,27 @@ export default function App() {
             )}
           </div>
 
-          {/* Manual refresh */}
           <button
             onClick={() => refetch()}
             disabled={isRefetching}
             className={clsx(
-              "h-10 w-10 rounded-lg transition-colors disabled:opacity-50 border flex items-center justify-center",
+              "h-10 w-10 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center",
               darkMode 
-                ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700 border-gray-600" 
-                : "text-gray-500 hover:text-gray-700 hover:bg-gray-100 border-gray-200"
+                ? "text-gray-400 hover:text-gray-200 hover:bg-gray-700" 
+                : "text-gray-500 hover:text-gray-700 hover:bg-white"
             )}
             title="Refresh runs"
           >
             <RefreshCw size={18} className={isRefetching ? 'animate-spin' : ''} />
           </button>
 
-          {/* Dark mode toggle - cute sun/moon button */}
           <button
             onClick={toggleDarkMode}
             className={clsx(
-              "h-10 w-10 rounded-full transition-all duration-300 border-2 relative overflow-hidden flex items-center justify-center",
+              "h-10 w-10 rounded-full transition-all duration-300 relative overflow-hidden flex items-center justify-center",
               darkMode 
-                ? "bg-indigo-900 border-indigo-400 text-yellow-300 hover:bg-indigo-800 shadow-lg shadow-indigo-500/30" 
-                : "bg-amber-50 border-amber-300 text-amber-500 hover:bg-amber-100 shadow-lg shadow-amber-200/50"
+                ? "bg-indigo-900 text-yellow-300 hover:bg-indigo-800 shadow-lg shadow-indigo-500/30" 
+                : "bg-amber-50 text-amber-500 hover:bg-amber-100 shadow-lg shadow-amber-200/50"
             )}
             title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
           >
@@ -258,6 +236,18 @@ export default function App() {
               {darkMode ? <Moon size={18} /> : <Sun size={18} />}
             </div>
           </button>
+          <div className={clsx(
+            "text-2xl font-semibold flex items-center gap-2 h-10",
+            darkMode ? "text-gray-100" : "text-gray-900"
+          )}>
+            <span>lowvr</span>
+            <img 
+              src="/lowvr-2d.png" 
+              alt="lowvr logo" 
+              className="w-10 h-10 object-contain translate-y-[2px]"
+            />
+          </div>
+          </div>
         </div>
       </header>
 
@@ -265,12 +255,24 @@ export default function App() {
         {/* Sidebar */}
         <aside 
           className={clsx(
-            'border-r flex flex-col transition-all duration-200 flex-shrink-0 relative',
-            darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
+            'flex flex-col transition-all duration-200 flex-shrink-0 relative rounded-2xl shadow-sm m-4',
+            darkMode ? 'bg-gray-800' : 'bg-[#fffdf8]'
           )}
           style={{ width: sidebarWidth }}
         >
           <>
+              <button
+                className={clsx(
+                  'w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-colors',
+                  darkMode
+                    ? 'text-gray-300 hover:text-gray-100 hover:bg-gray-700'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-white'
+                )}
+                onClick={() => setShowConfigFilter(!showConfigFilter)}
+              >
+                <span className="font-medium">Configs</span>
+                <span className="text-xs">{showConfigFilter ? '▲' : '▼'}</span>
+              </button>
               {/* Config Filter Panel */}
               {showConfigFilter && (
                 <div className="max-h-56 overflow-y-auto flex-shrink-0">
@@ -285,46 +287,18 @@ export default function App() {
               {selectedRunIds.length > 0 && (
                 <div className="flex-shrink-0">
                   {/* Draggable divider between Runs and Metrics */}
-                  <div
-                    className={clsx(
-                      'w-full border-t-2 flex items-center justify-center gap-1 text-base transition-colors cursor-ns-resize select-none',
-                      isResizingMetrics 
-                        ? 'border-amber-400 bg-amber-50 text-amber-600' 
-                        : darkMode
-                          ? 'border-gray-700 text-gray-500 hover:border-amber-500 hover:bg-gray-700 hover:text-gray-300'
-                          : 'border-gray-200 text-gray-400 hover:border-amber-300 hover:bg-gray-50 hover:text-gray-600'
-                    )}
-                    onMouseDown={(e) => {
-                      e.preventDefault()
-                      setIsResizingMetrics(true)
-                      const startY = e.clientY
-                      const startHeight = metricsHeight
-                      
-                      const onMouseMove = (moveEvent: MouseEvent) => {
-                        const deltaY = startY - moveEvent.clientY
-                        const newHeight = Math.max(50, Math.min(400, startHeight + deltaY))
-                        setMetricsHeight(newHeight)
-                      }
-                      
-                      const onMouseUp = () => {
-                        setIsResizingMetrics(false)
-                        window.removeEventListener('mousemove', onMouseMove)
-                        window.removeEventListener('mouseup', onMouseUp)
-                      }
-                      
-                      window.addEventListener('mousemove', onMouseMove)
-                      window.addEventListener('mouseup', onMouseUp)
-                    }}
-                  >
+                  <div className="pt-2">
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setShowMetrics(!showMetrics)
-                      }}
-                      className="py-1 flex items-center gap-1"
+                      onClick={() => setShowMetrics(!showMetrics)}
+                      className={clsx(
+                        'w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-colors cursor-pointer',
+                        darkMode
+                          ? 'text-gray-300 hover:text-gray-100 hover:bg-gray-700'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-white'
+                      )}
                     >
-                      <span>{showMetrics ? '▼' : '▶'}</span>
-                      <span>Metrics</span>
+                      <span className="font-medium">Metrics</span>
+                      <span className="text-xs">{showMetrics ? '▲' : '▼'}</span>
                     </button>
                   </div>
                   {showMetrics && (
@@ -353,7 +327,7 @@ export default function App() {
         {/* Main content */}
         <main className={clsx(
           "flex-1 overflow-hidden flex flex-col transition-colors",
-          darkMode ? "bg-gray-900" : "bg-white"
+          darkMode ? "bg-gray-900" : "bg-[#f7f2ea]"
         )}>
           {showRunSets && (
             <div className={clsx(

@@ -44,6 +44,10 @@ interface AppState {
   // View mode
   viewMode: 'charts' | 'videos' | 'both'
   setViewMode: (mode: 'charts' | 'videos' | 'both') => void
+
+  // Charts x-axis key
+  xAxisKey: string
+  setXAxisKey: (key: string) => void
   
   // Hovered run for highlighting in charts
   hoveredRunId: string | null
@@ -173,6 +177,9 @@ export const useAppStore = create<AppState>()(
 
       viewMode: 'both',
       setViewMode: (mode) => set({ viewMode: mode }),
+
+      xAxisKey: '_step',
+      setXAxisKey: (key) => set({ xAxisKey: key }),
       
       hoveredRunId: null,
       setHoveredRunId: (runId) => set({ hoveredRunId: runId }),
@@ -193,6 +200,7 @@ export const useAppStore = create<AppState>()(
         activeMetrics: state.activeMetrics,
         sidebarCollapsed: state.sidebarCollapsed,
         viewMode: state.viewMode,
+        xAxisKey: state.xAxisKey,
         darkMode: state.darkMode,
         runColors: state.runColors,
       }),
